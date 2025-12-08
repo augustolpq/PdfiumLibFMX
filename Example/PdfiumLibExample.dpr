@@ -1,7 +1,8 @@
-program PdfiumLibExample;
+program PdfiumLibFMXExample;
 
 uses
-  Vcl.Forms,
+  System.StartUpCopy,
+  FMX.Forms,
   MainFrm in 'MainFrm.pas' {frmMain},
   PdfiumCore in '..\Source\PdfiumCore.pas',
   PdfiumCtrl in '..\Source\PdfiumCtrl.pas',
@@ -11,7 +12,6 @@ uses
 
 begin
   Application.Initialize;
-  Application.MainFormOnTaskbar := True;
   Application.CreateForm(TfrmMain, frmMain);
   Application.Run;
 end.
