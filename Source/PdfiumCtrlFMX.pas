@@ -293,16 +293,16 @@ type
 
     property Align;
     property Anchors;
-    property Color default clGray;
-    property Constraints;
-    property DragCursor;
-    property DragKind;
+//    property Color default clGray;
+//    property Constraints;
+//    property DragCursor;
+//    property DragKind;
     property DragMode;
     property Enabled;
-    property Font;
-    property ParentBackground default False;
-    property ParentColor default False;
-    property ParentFont;
+//    property Font;
+//    property ParentBackground default False;
+//    property ParentColor default False;
+//    property ParentFont;
     property ParentShowHint;
     property PopupMenu;
     property ShowHint;
@@ -310,17 +310,17 @@ type
     property TabStop default True;
     property Visible;
     property OnClick;
-    property OnContextPopup;
+//    property OnContextPopup;
     property OnDblClick;
     property OnDragDrop;
     property OnDragOver;
-    property OnEndDock;
-    property OnEndDrag;
+//    property OnEndDock;
+//    property OnEndDrag;
     property OnKeyDown;
-    property OnKeyPress;
+//    property OnKeyPress;
     property OnKeyUp;
     {$IFNDEF FPC}
-    property OnMouseActivate;
+//    property OnMouseActivate;
     {$ENDIF ~FPC}
     property OnMouseDown;
     property OnMouseEnter;
@@ -328,8 +328,8 @@ type
     property OnMouseMove;
     property OnMouseUp;
     property OnPaint: TNotifyEvent read FOnPaint write FOnPaint;
-    property OnStartDock;
-    property OnStartDrag;
+//    property OnStartDock;
+//    property OnStartDrag;
     {$IFDEF VCL_HAS_TOUCH}
     property Touch;
     property OnGesture;
@@ -359,7 +359,7 @@ type
 implementation
 
 uses
-  Math, Clipbrd, Character, Printers;
+  Math, FMX.Clipboard.Win, Character, FMX.Printer;
 
 const
   cScrollTimerId = 1;
@@ -472,7 +472,7 @@ end;
 
 function TPdfDocumentVclPrinter.GetPrinterDC: HDC;
 begin
-  Result := Printer.Canvas.Handle;
+//  Result := Printer.Canvas.Handle;
 end;
 
 class function TPdfDocumentVclPrinter.PrintDocument(ADocument: TPdfDocument;
@@ -498,7 +498,7 @@ begin
       begin
         Dlg.MinPage := 1;
         Dlg.MaxPage := ADocument.PageCount;
-        Dlg.Options := Dlg.Options + [poPageNums];
+//        Dlg.Options := Dlg.Options + [poPageNums];
       end;
 
       // Show the PrintDialog
@@ -506,20 +506,20 @@ begin
       Result := Dlg.Execute;
       {$ELSE}
       if (AParentWnd = 0) or not IsWindow(AParentWnd) then
-        Result := Dlg.Execute
-      else
-        Result := Dlg.Execute(AParentWnd);
+        Result := Dlg.Execute;
+//      else
+//        Result := Dlg.Execute(AParentWnd);
       {$ENDIF FPC}
 
       if not Result then
         Exit;
 
       // Adjust print options
-      if AllowPageRange and (Dlg.PrintRange = prPageNums) then
-      begin
-        FromPage := Dlg.FromPage;
-        ToPage := Dlg.ToPage;
-      end;      
+//      if AllowPageRange and (Dlg.PrintRange = prPageNums) then
+//      begin
+//        FromPage := Dlg.FromPage;
+//        ToPage := Dlg.ToPage;
+//      end;
     finally
       Dlg.Free;
     end;
@@ -546,7 +546,7 @@ end;
 constructor TPdfControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  ControlStyle := ControlStyle + [csOpaque];
+//  ControlStyle := ControlStyle + [csOpaque];
 
   FScaleMode := smFitAuto;
   FZoomPercentage := 100;
@@ -568,11 +568,11 @@ begin
   FDocument := TPdfDocument.Create;
   InitDocument;
 
-  ParentDoubleBuffered := False;
-  ParentBackground := False;
-  ParentColor := False;
+//  ParentDoubleBuffered := False;
+//  ParentBackground := False;
+//  ParentColor := False;
   TabStop := True;
-  Color := clGray;
+//  Color := clGray;
   Width := 130;
   Height := 180;
 end;
@@ -598,9 +598,9 @@ end;
 procedure TPdfControl.DestroyWnd;
 begin
   StopScrollTimer;
-  if FCheckForTrippleClick then
-    KillTimer(Handle, cTrippleClickTimerId);
-  inherited DestroyWnd;
+//  if FCheckForTrippleClick then
+//    KillTimer(Handle, cTrippleClickTimerId);
+//  inherited DestroyWnd;
 end;
 
 {$IFDEF USE_PRINTCLIENT_WORKAROUND}
@@ -643,7 +643,7 @@ begin
   begin
     SelBmp := TBitmap.Create;
     try
-      SelBmp.Canvas.Brush.Color := Color;
+      SelBmp.Canvas.Fill.Color := Color;
       SelBmp.SetSize(100, 50);
       {$IFDEF FPC}
       // Delphi fills the bitmap with the brush if it is resized, FPC doesn't
@@ -730,9 +730,9 @@ procedure TPdfControl.DrawPage(DC: HDC; Page: TPdfPage; DirectDrawPage: Boolean)
     PageBrush: HBRUSH;
     ColorRef: TColorRef;
   begin
-    if PageColor = clDefault then //See what we can replace instead of clDefault
-      ColorRef := ColorToRGB(Color)
-    else
+//    if PageColor = clDefault then //See what we can replace instead of clDefault
+//      ColorRef := ColorToRGB(Color)
+//    else
       ColorRef := ColorToRGB(PageColor);
 
     // Page.Draw doesn't paint the background if proPrinting is enabled.
