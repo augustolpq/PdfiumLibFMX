@@ -27,8 +27,8 @@ uses
   {$IFDEF FPC}
   LCLType, PrintersDlgs, Win32Extra,
   {$ENDIF FPC}
-  Windows, Messages, ShellAPI, Types, SysUtils, Classes, Contnrs, Graphics, Controls,
-  Forms, Dialogs, PdfiumCore;
+  Windows, Messages, ShellAPI, Types, SysUtils, Classes, Contnrs, FMX.Graphics, System.UITypes, FMX.Controls,
+  FMX.Forms, FMX.Dialogs, PdfiumCore;
 
 type
   TPdfControlLinkOptionType = (
@@ -61,7 +61,7 @@ type
   TPdfControlAnnotationLinkClickEvent = procedure(Sender: TObject; LinkInfo: TPdfLinkInfo; var Handled: Boolean) of object;
   TPdfControlRectArray = array of TRect;
 
-  TPdfControl = class(TCustomControl)
+  TPdfControl = class(TControl)
   private
     FDocument: TPdfDocument;
     FPageIndex: Integer;
@@ -93,7 +93,7 @@ type
     FDrawOptions: TPdfPageRenderOptions;
     FScaleMode: TPdfControlScaleMode;
     FZoomPercentage: Integer;
-    FPageColor: TColor;
+    FPageColor: TAlphaColor;
     FScrollMousePos: TPoint;
     FLinkOptions: TPdfControlLinkOptions;
     FHighlightTextRects: TPdfRectArray;
@@ -101,9 +101,9 @@ type
     FFormOutputSelectedRects: TPdfRectArray;
     FFormFieldFocused: Boolean;
     FPageShadowSize: Integer;
-    FPageShadowColor: TColor;
+    FPageShadowColor: TAlphaColor;
     FPageShadowPadding: Integer;
-    FPageBorderColor: TColor;
+    FPageBorderColor: TAlphaColor;
 
     FOnWebLinkClick: TPdfControlWebLinkClickEvent;
     FOnAnnotationLinkClick: TPdfControlAnnotationLinkClickEvent;
@@ -116,11 +116,11 @@ type
     procedure WMHScroll(var Message: TWMHScroll); message WM_HSCROLL;
     procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
-    procedure CMColorchanged(var Message: TMessage); message CM_COLORCHANGED;
+//    procedure CMColorchanged(var Message: TMessage); message CM_COLORCHANGED;
     {$IFDEF USE_PRINTCLIENT_WORKAROUND}
     procedure WMPrintClient(var Message: TWMPrintClient); message WM_PRINTCLIENT;
     {$ENDIF USE_PRINTCLIENT_WORKAROUND}
-    procedure CMMouseleave(var Message: TMessage); message CM_MOUSELEAVE;
+//    procedure CMMouseleave(var Message: TMessage); message CM_MOUSELEAVE;
 
     procedure GetPageWebLinks;
     function GetCurrentPage: TPdfPage;
@@ -134,13 +134,13 @@ type
     function GetSelStart: Integer;
     procedure SetSelection(Active: Boolean; StartIndex, StopIndex: Integer);
     procedure SetScaleMode(const Value: TPdfControlScaleMode);
-    procedure SetPageBorderColor(const Value: TColor);
-    procedure SetPageShadowColor(const Value: TColor);
+    procedure SetPageBorderColor(const Value: TAlphaColor);
+    procedure SetPageShadowColor(const Value: TAlphaColor);
     procedure SetPageShadowPadding(const Value: Integer);
     procedure SetPageShadowSize(const Value: Integer);
     procedure AdjustDrawPos;
     procedure UpdatePageDrawInfo;
-    procedure SetPageColor(const Value: TColor);
+    procedure SetPageColor(const Value: TAlphaColor);
     procedure SetDrawOptions(const Value: TPdfPageRenderOptions);
     procedure InvalidateRectDiffs(const OldRects, NewRects: TPdfControlRectArray);
     procedure InvalidatePdfRectDiffs(const OldRects, NewRects: TPdfRectArray);
@@ -162,7 +162,7 @@ type
     procedure FormFieldFocus(Document: TPdfDocument; Value: PWideChar; ValueLen: Integer; FieldFocused: Boolean);
     procedure ExecuteNamedAction(Document: TPdfDocument; NamedAction: TPdfNamedActionType);
 
-    procedure DrawAlphaRects(DC: HDC; Page: TPdfPage; const Rects: TPdfRectArray; Color: TColor);
+    procedure DrawAlphaRects(DC: HDC; Page: TPdfPage; const Rects: TPdfRectArray; Color: TAlphaColor);
     procedure DrawAlphaSelection(DC: HDC; Page: TPdfPage; const Rects: TPdfRectArray);
     procedure DrawFormOutputSelectedRects(DC: HDC; Page: TPdfPage);
   protected
@@ -264,7 +264,7 @@ type
   published
     property ScaleMode: TPdfControlScaleMode read FScaleMode write SetScaleMode default smFitAuto;
     property ZoomPercentage: Integer read FZoomPercentage write SetZoomPercentage default 100;
-    property PageColor: TColor read FPageColor write SetPageColor default clWhite;
+    property PageColor: TAlphaColor read FPageColor write SetPageColor default TAlphaColors.White;
     property Rotation: TPdfPageRotation read FRotation write SetRotation default prNormal;
     property BufferedPageDraw: Boolean read FBufferedPageDraw write FBufferedPageDraw default True;
     property AllowUserTextSelection: Boolean read FAllowUserTextSelection write FAllowUserTextSelection default True;
@@ -276,8 +276,8 @@ type
     property ChangePageOnMouseScrolling: Boolean read FChangePageOnMouseScrolling write FChangePageOnMouseScrolling default False;
     property LinkOptions: TPdfControlLinkOptions read FLinkOptions write FLinkOptions default cPdfControlDefaultLinkOptions;
 
-    property PageBorderColor: TColor read FPageBorderColor write SetPageBorderColor default clNone;
-    property PageShadowColor: TColor read FPageShadowColor write SetPageShadowColor default clNone;
+    property PageBorderColor: TAlphaColor read FPageBorderColor write SetPageBorderColor default TAlphaColors.Null;
+    property PageShadowColor: TAlphaColor read FPageShadowColor write SetPageShadowColor default TAlphaColors.Null;
     property PageShadowSize: Integer read FPageShadowSize write SetPageShadowSize default 4;
     property PageShadowPadding: Integer read FPageShadowPadding write SetPageShadowPadding default 44;
 
@@ -550,7 +550,7 @@ begin
 
   FScaleMode := smFitAuto;
   FZoomPercentage := 100;
-  FPageColor := clWhite;
+  FPageColor := TAlphaColors.White;
   FRotation := prNormal;
   FAllowUserTextSelection := True;
   FAllowUserPageChange := True;
@@ -560,8 +560,8 @@ begin
   FBufferedPageDraw := True;
   FLinkOptions := cPdfControlDefaultLinkOptions;
 
-  FPageBorderColor := clNone;
-  FPageShadowColor := clNone;
+  FPageBorderColor := TAlphaColors.Null;
+  FPageShadowColor := TAlphaColors.Null;
   FPageShadowSize := 4;
   FPageShadowPadding := 44;
 
@@ -629,7 +629,7 @@ begin
   DrawAlphaRects(DC, Page, Rects, RGB(50, 142, 254));
 end;
 
-procedure TPdfControl.DrawAlphaRects(DC: HDC; Page: TPdfPage; const Rects: TPdfRectArray; Color: TColor);
+procedure TPdfControl.DrawAlphaRects(DC: HDC; Page: TPdfPage; const Rects: TPdfRectArray; Color: TAlphaColor);
 var
   Count: Integer;
   I: Integer;
@@ -699,7 +699,7 @@ var
   BorderBrush, ShadowBrush: HBRUSH;
 begin
   // Draw page borders
-  if PageBorderColor <> clNone then
+  if PageBorderColor <> TAlphaColors.Null then
   begin
     BorderBrush := CreateSolidBrush(ColorToRGB(PageBorderColor));
     FillRect(DC, Rect(FDrawX, FDrawY, FDrawX + FDrawWidth, FDrawY + 1), BorderBrush);                             // top border
@@ -710,7 +710,7 @@ begin
   end;
 
   // Draw page shadow
-  if (PageShadowColor <> clNone) and (PageShadowSize > 0) then
+  if (PageShadowColor <> TAlphaColors.Null) and (PageShadowSize > 0) then
   begin
     ShadowBrush := CreateSolidBrush(ColorToRGB(PageShadowColor));
     FillRect(DC, Rect(FDrawX + FDrawWidth, FDrawY + PageShadowSize,
@@ -730,7 +730,7 @@ procedure TPdfControl.DrawPage(DC: HDC; Page: TPdfPage; DirectDrawPage: Boolean)
     PageBrush: HBRUSH;
     ColorRef: TColorRef;
   begin
-    if PageColor = clDefault then
+    if PageColor = clDefault then //See what we can replace instead of clDefault
       ColorRef := ColorToRGB(Color)
     else
       ColorRef := ColorToRGB(PageColor);
@@ -1215,7 +1215,7 @@ begin
   end;
 end;
 
-procedure TPdfControl.SetPageColor(const Value: TColor);
+procedure TPdfControl.SetPageColor(const Value: TAlphaColor);
 begin
   if Value <> FPageColor then
   begin
@@ -1242,7 +1242,7 @@ begin
   end;
 end;
 
-procedure TPdfControl.SetPageBorderColor(const Value: TColor);
+procedure TPdfControl.SetPageBorderColor(const Value: TAlphaColor);
 begin
   if Value <> FPageBorderColor then
   begin
@@ -1251,7 +1251,7 @@ begin
   end;
 end;
 
-procedure TPdfControl.SetPageShadowColor(const Value: TColor);
+procedure TPdfControl.SetPageShadowColor(const Value: TAlphaColor);
 begin
   if Value <> FPageShadowColor then
   begin

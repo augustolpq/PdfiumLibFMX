@@ -25,14 +25,14 @@ implementation
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  FCtrl := TPdfControl.Create(Self);
-  FCtrl.Align := alClient;
-  FCtrl.Parent := Self;
-
-  if OpenDialog1.Execute then
-    FCtrl.LoadFromFile(OpenDialog1.FileName)
-  else
-    Close;
+//  FCtrl := TPdfControl.Create(Self);
+//  FCtrl.Align := alClient;
+//  FCtrl.Parent := Self;
+//
+//  if OpenDialog1.Execute then
+//    FCtrl.LoadFromFile(OpenDialog1.FileName)
+//  else
+//    Close;
 end;
 
 end.
