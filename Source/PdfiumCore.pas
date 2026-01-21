@@ -274,6 +274,7 @@ type
 
     procedure SetValue(const Value: string);
     procedure SetChecked(const Value: Boolean);
+    procedure SetFlags(const Value: TPdfFormFieldFlags);
   protected
     constructor Create(AAnnotation: TPdfAnnotation);
 
@@ -288,7 +289,7 @@ type
     function SelectComboBoxOption(OptionIndex: Integer): Boolean;
     function SelectListBoxOption(OptionIndex: Integer; Selected: Boolean = True): Boolean;
 
-    property Flags: TPdfFormFieldFlags read GetFlags;
+    property Flags: TPdfFormFieldFlags read GetFlags write SetFlags;
     property ReadOnly: Boolean read GetReadOnly;
     property Name: string read GetName;
     property AlternateName: string read GetAlternateName;
@@ -4147,6 +4148,37 @@ begin
   end;
 end;
 
+procedure TPdfFormField.SetFlags(const Value: TPdfFormFieldFlags);
+var
+  FormFlags: Integer;
+begin
+  FPage.FDocument.CheckActive;
+
+  FormFlags := FPDF_FORMFLAG_NONE;
+  if Value <> [] then
+  begin
+    if fffReadOnly in Value then
+      FormFlags := FormFlags or FPDF_FORMFLAG_READONLY;
+    if fffRequired in Value then
+      FormFlags := FormFlags or FPDF_FORMFLAG_REQUIRED;
+    if fffNoExport in Value then
+      FormFlags := FormFlags or FPDF_FORMFLAG_NOEXPORT;
+
+    if fffTextMultiLine in Value then
+      FormFlags := FormFlags or FPDF_FORMFLAG_TEXT_MULTILINE;
+    if fffTextPassword in Value then
+      FormFlags := FormFlags or FPDF_FORMFLAG_TEXT_PASSWORD;
+
+    if fffChoiceCombo in Value then
+      FormFlags := FormFlags or FPDF_FORMFLAG_CHOICE_COMBO;
+    if fffChoiceEdit in Value then
+      FormFlags := FormFlags or FPDF_FORMFLAG_CHOICE_EDIT;
+    if fffChoiceMultiSelect in Value then
+      FormFlags := FormFlags or FPDF_FORMFLAG_CHOICE_MULTI_SELECT;
+  end;
+
+  FPDFAnnot_SetFormFieldFlags(FPage.FDocument.FormHandle, Handle, FormFlags);
+end;
 
 { TPdfLinkGotoDestination }
 
