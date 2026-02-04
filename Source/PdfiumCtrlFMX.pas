@@ -112,6 +112,7 @@ type
     FAniVertScrollPos: Single;
     FScrollTimerObj: TTimer;
     FLastMouseMovePos: TPointF;
+    FLastClickTime: TDateTime;
 
     FOnWebLinkClick: TPdfControlWebLinkClickEvent;
     FOnAnnotationLinkClick: TPdfControlAnnotationLinkClickEvent;
@@ -1248,12 +1249,26 @@ begin
       end;
     end;
 
-    if AllowUserTextSelection and not FFormFieldFocused then
+    if AllowUserTextSelection and not FFormFieldFocused and (Button = TMouseButton.mbLeft) then
     begin
-      if Button = TMouseButton.mbLeft then
+      PagePt := DeviceToPage(Round(X), Round(Y));
+      CharIndex := Page.GetCharIndexAt(PagePt.X, PagePt.Y, MAXWORD, MAXWORD);
+      if CharIndex >= 0 then
       begin
-        PagePt := DeviceToPage(Round(X), Round(Y));
-        CharIndex := Page.GetCharIndexAt(PagePt.X, PagePt.Y, MAXWORD, MAXWORD);
+        if FCheckForTrippleClick and (Now - FLastClickTime < 0.000006) then // approx 500ms
+        begin
+          FMousePressed := False;
+          FCheckForTrippleClick := False;
+          SelectLine(CharIndex);
+        end
+        else if ssDouble in Shift then
+        begin
+          FMousePressed := False;
+          SelectWord(CharIndex);
+          FCheckForTrippleClick := True;
+          FLastClickTime := Now;
+        end
+        else
         begin
           FCheckForTrippleClick := False;
           SetSelection(False, CharIndex, CharIndex);
@@ -1583,28 +1598,6 @@ begin
     InvalidateRectDiffs(OldRs, NewRs);
   end;
 end;
-procedure TPdfControl.SetSelection(Active: Boolean; StartIndex, StopIndex: Integer);
-var
-  OldRects, NewRects: TPdfControlRectArray;
-begin
-  if (Active <> FSelectionActive) or (StartIndex <> FSelStartCharIndex) or (StopIndex <> FSelStopCharIndex) then
-  begin
-    OldRects := GetSelectionRects;
-
-    FSelStartCharIndex := StartIndex;
-    FSelStopCharIndex := StopIndex;
-    FSelectionActive := Active and (FSelStartCharIndex >= 0) and (FSelStopCharIndex >= 0);
-
-    NewRects := GetSelectionRects;
-    InvalidateRectDiffs(OldRects, NewRects);
-  end;
-end;
-
-procedure TPdfControl.ClearSelection;
-begin
-  SetSelection(False, 0, 0);
-end;
-
 procedure TPdfControl.SelectAll;
 begin
   SelectText(0, -1);
@@ -1713,6 +1706,28 @@ begin
   end;
 end;
 
+procedure TPdfControl.SetSelection(Active: Boolean; StartIndex, StopIndex: Integer);
+var
+  OldRects, NewRects: TPdfControlRectArray;
+begin
+  if (Active <> FSelectionActive) or (StartIndex <> FSelStartCharIndex) or (StopIndex <> FSelStopCharIndex) then
+  begin
+    OldRects := GetSelectionRects;
+
+    FSelStartCharIndex := StartIndex;
+    FSelStopCharIndex := StopIndex;
+    FSelectionActive := Active and (FSelStartCharIndex >= 0) and (FSelStopCharIndex >= 0);
+
+    NewRects := GetSelectionRects;
+    InvalidateRectDiffs(OldRects, NewRects);
+  end;
+end;
+
+procedure TPdfControl.ClearSelection;
+begin
+  SetSelection(False, 0, 0);
+end;
+
 // procedure TPdfControl.WMGetDlgCode(var Message: TWMGetDlgCode);
 // begin
 //   inherited;
@@ -1741,24 +1756,18 @@ begin
   YOffset := 0;
   case Key of
     vkC:
-      if AllowUserTextSelection then
+      if AllowUserTextSelection and (ssCtrl in Shift) then
       begin
-        if ssCtrl in Shift then
-        begin
-          if FSelectionActive then
-            CopyToClipboard;
-          Key := 0;
-        end
+        if FSelectionActive then
+          CopyToClipboard;
+        Key := 0;
       end;
 
     vkA:
-      if AllowUserTextSelection then
+      if AllowUserTextSelection and (ssCtrl in Shift) then
       begin
-        if ssCtrl in Shift then
-        begin
-          SelectAll;
-          Key := 0;
-        end;
+        SelectAll;
+        Key := 0;
       end;
 
     vkLeft, vkRight:
@@ -1822,22 +1831,12 @@ begin
         end
         else
         begin
-          if ssShift in Shift then
-          begin
-            if Key = vkEnd then
-              XOffset := FDrawWidth
-            else
-              XOffset := -FDrawWidth;
-          end
+          if Key = vkEnd then
+            YOffset := Round(FDrawHeight)
           else
-          begin
-            if Key = vkEnd then
-              YOffset := FDrawHeight
-            else
-              YOffset := -FDrawHeight;
-          end;
+            YOffset := -Round(FDrawHeight);
         end;
-        if Handled or (XOffset <> 0) or (YOffset <> 0) then
+        if Handled or (YOffset <> 0) then
           Key := 0;
       end;
   end;
