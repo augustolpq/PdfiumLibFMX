@@ -106,6 +106,8 @@ type
     FPageShadowColor: TAlphaColor;
     FPageShadowPadding: Integer;
     FPageBorderColor: TAlphaColor;
+    FHorzScrollPos: Integer;
+    FVertScrollPos: Integer;
 
     FOnWebLinkClick: TPdfControlWebLinkClickEvent;
     FOnAnnotationLinkClick: TPdfControlAnnotationLinkClickEvent;
@@ -539,6 +541,8 @@ begin
   FPageShadowColor := TAlphaColors.Null;
   FPageShadowSize := 4;
   FPageShadowPadding := 44;
+  FHorzScrollPos := 0;
+  FVertScrollPos := 0;
 
   FDocument := TPdfDocument.Create;
   InitDocument;
@@ -847,14 +851,20 @@ function TPdfControl.GotoNextPage(ScrollTransition: Boolean): Boolean;
 begin
   Result := PageIndex < PageCount - 1;
   if Result then
+  begin
     InternSetPageIndex(PageIndex + 1, ScrollTransition, False);
+    ScrollContentTo(0, 0);
+  end;
 end;
 
 function TPdfControl.GotoPrevPage(ScrollTransition: Boolean): Boolean;
 begin
   Result := PageIndex > 0;
   if Result then
+  begin
     InternSetPageIndex(PageIndex - 1, ScrollTransition, False);
+    ScrollContentTo(0, 0);
+  end;
 end;
 
 procedure TPdfControl.PageChange;
@@ -2094,26 +2104,60 @@ var
 begin
   X := Round((Width - FDrawWidth) / 2);
   Y := Round((Height - FDrawHeight) / 2);
-  if X < 0 then X := 0;
-  if Y < 0 then Y := 0;
+
+  if FDrawWidth > Width then
+    X := -FHorzScrollPos
+  else
+    FHorzScrollPos := 0;
+
+  if FDrawHeight > Height then
+    Y := -FVertScrollPos
+  else
+    FVertScrollPos := 0;
 
   if (FDrawX <> X) or (FDrawY <> Y) then
   begin
     FDrawX := X;
     FDrawY := Y;
+    Repaint;
   end;
 end;
 
 function TPdfControl.ScrollContent(XOffset, YOffset: Integer; Smooth: Boolean): Boolean;
 begin
-  // Placeholder for internal scrolling logic if needed in FMX
-  Result := False;
+  Result := ScrollContentTo(FHorzScrollPos + XOffset, FVertScrollPos + YOffset, Smooth);
 end;
 
-function TPdfControl.ScrollContentTo(X, Y: Integer; Smooth: Boolean = False): Boolean;
+function TPdfControl.ScrollContentTo(X, Y: Integer; Smooth: Boolean): Boolean;
+var
+  MaxX, MaxY: Integer;
 begin
   Result := False;
+  if FDrawWidth > Width then
+    MaxX := Round(FDrawWidth - Width)
+  else
+    MaxX := 0;
+
+  if FDrawHeight > Height then
+    MaxY := Round(FDrawHeight - Height)
+  else
+    MaxY := 0;
+
+  if X < 0 then X := 0;
+  if X > MaxX then X := MaxX;
+  if Y < 0 then Y := 0;
+  if Y > MaxY then Y := MaxY;
+
+  if (X <> FHorzScrollPos) or (Y <> FVertScrollPos) then
+  begin
+    FHorzScrollPos := X;
+    FVertScrollPos := Y;
+    AdjustDrawPos;
+    Result := True;
+  end;
 end;
+
+
 
 procedure TPdfControl.WMVScroll(var Message: TWMVScroll);
 begin
