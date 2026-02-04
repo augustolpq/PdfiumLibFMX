@@ -103,13 +103,17 @@ object Form1: TForm1
     Size.PlatformDefault = False
     TabOrder = 9
     Text = 'LCDOptimize'
-    OnClick = chkLCDOptimizeClick
+    OnChange = chkLCDOptimizeChange
   end
   object chkSmoothScroll: TCheckBox
     Position.X = 520.000000000000000000
     Position.Y = 3.000000000000000000
+    Size.Width = 96.000000000000000000
+    Size.Height = 19.000000000000000000
+    Size.PlatformDefault = False
     TabOrder = 10
     Text = 'SmoothScroll'
+    OnChange = chkSmoothScrollChange
   end
   object edtZoom: TSpinBox
     Touch.InteractiveGestures = [LongTap, DoubleTap]

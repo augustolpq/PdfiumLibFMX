@@ -108,12 +108,18 @@ type
     FPageBorderColor: TAlphaColor;
     FHorzScrollPos: Integer;
     FVertScrollPos: Integer;
+    FAniHorzScrollPos: Single;
+    FAniVertScrollPos: Single;
 
     FOnWebLinkClick: TPdfControlWebLinkClickEvent;
     FOnAnnotationLinkClick: TPdfControlAnnotationLinkClickEvent;
     FOnPageChange: TNotifyEvent;
     FOnPaint: TNotifyEvent;
     FOnPrintDocument: TNotifyEvent;
+
+    procedure SetAniHorzScrollPos(const Value: Single);
+    procedure SetAniVertScrollPos(const Value: Single);
+
 
     {$IFDEF MSWINDOWS}
     procedure WMVScroll(var Message: TWMVScroll); message WM_VSCROLL;
@@ -278,6 +284,9 @@ type
     property ChangePageOnMouseScrolling: Boolean read FChangePageOnMouseScrolling write FChangePageOnMouseScrolling default False;
     property LinkOptions: TPdfControlLinkOptions read FLinkOptions write FLinkOptions default cPdfControlDefaultLinkOptions;
 
+    property AniHorzScrollPos: Single read FAniHorzScrollPos write SetAniHorzScrollPos;
+    property AniVertScrollPos: Single read FAniVertScrollPos write SetAniVertScrollPos;
+
     property PageBorderColor: TAlphaColor read FPageBorderColor write SetPageBorderColor default TAlphaColors.Null;
     property PageShadowColor: TAlphaColor read FPageShadowColor write SetPageShadowColor default TAlphaColors.Null;
     property PageShadowSize: Integer read FPageShadowSize write SetPageShadowSize default 4;
@@ -361,7 +370,7 @@ type
 implementation
 
 uses
-  Math, System.Character, FMX.Printer, FMX.Platform, System.Rtti;
+  Math, System.Character, FMX.Printer, FMX.Platform, System.Rtti, FMX.Ani;
 
 const
   cScrollTimerId = 1;
@@ -543,6 +552,8 @@ begin
   FPageShadowPadding := 44;
   FHorzScrollPos := 0;
   FVertScrollPos := 0;
+  FAniHorzScrollPos := 0;
+  FAniVertScrollPos := 0;
 
   FDocument := TPdfDocument.Create;
   InitDocument;
@@ -2123,6 +2134,20 @@ begin
   end;
 end;
 
+procedure TPdfControl.SetAniHorzScrollPos(const Value: Single);
+begin
+  FAniHorzScrollPos := Value;
+  FHorzScrollPos := Round(FAniHorzScrollPos);
+  AdjustDrawPos;
+end;
+
+procedure TPdfControl.SetAniVertScrollPos(const Value: Single);
+begin
+  FAniVertScrollPos := Value;
+  FVertScrollPos := Round(FAniVertScrollPos);
+  AdjustDrawPos;
+end;
+
 function TPdfControl.ScrollContent(XOffset, YOffset: Integer; Smooth: Boolean): Boolean;
 begin
   Result := ScrollContentTo(FHorzScrollPos + XOffset, FVertScrollPos + YOffset, Smooth);
@@ -2150,9 +2175,21 @@ begin
 
   if (X <> FHorzScrollPos) or (Y <> FVertScrollPos) then
   begin
-    FHorzScrollPos := X;
-    FVertScrollPos := Y;
-    AdjustDrawPos;
+    if Smooth then
+    begin
+      TAnimator.AnimateFloat(Self, 'AniHorzScrollPos', X, 0.2, TAnimationType.Out, TInterpolationType.Quadratic);
+      TAnimator.AnimateFloat(Self, 'AniVertScrollPos', Y, 0.2, TAnimationType.Out, TInterpolationType.Quadratic);
+    end
+    else
+    begin
+      TAnimator.StopPropertyAnimation(Self, 'AniHorzScrollPos');
+      TAnimator.StopPropertyAnimation(Self, 'AniVertScrollPos');
+      FAniHorzScrollPos := X;
+      FAniVertScrollPos := Y;
+      FHorzScrollPos := X;
+      FVertScrollPos := Y;
+      AdjustDrawPos;
+    end;
     Result := True;
   end;
 end;
@@ -2198,9 +2235,9 @@ begin
     else
     begin
       if ssShift in Shift then
-        Handled := ScrollContent(-WheelDelta, 0, SmoothScroll)
+        Handled := ScrollContent(-WheelDelta, 0, FSmoothScroll)
       else
-        Handled := ScrollContent(0, -WheelDelta, SmoothScroll);
+        Handled := ScrollContent(0, -WheelDelta, FSmoothScroll);
 
       if not Handled and FChangePageOnMouseScrolling then
       begin

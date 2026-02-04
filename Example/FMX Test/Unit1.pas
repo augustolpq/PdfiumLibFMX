@@ -31,12 +31,13 @@ type
     procedure btnNextClick(Sender: TObject);
     procedure btnHighlightClick(Sender: TObject);
     procedure btnScaleClick(Sender: TObject);
-    procedure chkLCDOptimizeClick(Sender: TObject);
     procedure edtZoomChange(Sender: TObject);
     procedure btnPrintClick(Sender: TObject);
     procedure ListViewAttachmentsDblClick(Sender: TObject);
     procedure btnAddAnnotationClick(Sender: TObject);
     procedure chkChangePageOnMouseScrollingChange(Sender: TObject);
+    procedure chkSmoothScrollChange(Sender: TObject);
+    procedure chkLCDOptimizeChange(Sender: TObject);
   private
     FCtrl: TPdfControl;
     procedure WebLinkClick(Sender: TObject; Url: string);
@@ -180,12 +181,17 @@ begin
 //  Caption := GetEnumName(TypeInfo(TPdfControlScaleMode), Ord(FCtrl.ScaleMode));
 end;
 
-procedure TForm1.chkLCDOptimizeClick(Sender: TObject);
+procedure TForm1.chkLCDOptimizeChange(Sender: TObject);
 begin
   if chkLCDOptimize.IsChecked then
     FCtrl.DrawOptions := FCtrl.DrawOptions + [proLCDOptimized]
   else
     FCtrl.DrawOptions := FCtrl.DrawOptions - [proLCDOptimized];
+end;
+
+procedure TForm1.chkSmoothScrollChange(Sender: TObject);
+begin
+  FCtrl.SmoothScroll := chkSmoothScroll.IsChecked;
 end;
 
 procedure TForm1.edtZoomChange(Sender: TObject);
