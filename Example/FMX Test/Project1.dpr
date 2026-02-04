@@ -4,7 +4,9 @@ uses
   System.StartUpCopy,
   FMX.Forms,
   Unit1 in 'Unit1.pas' {Form1},
-  PdfiumCtrlFMX in '..\..\Source\PdfiumCtrlFMX.pas';
+  PdfiumCtrlFMX in '..\..\Source\PdfiumCtrlFMX.pas',
+  PdfiumCore in '..\..\Source\PdfiumCore.pas',
+  PdfiumLib in '..\..\Source\PdfiumLib.pas';
 
 {$R *.res}
 

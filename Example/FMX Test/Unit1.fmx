@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 0
   Top = 0
   Caption = 'Form1'
-  ClientHeight = 473
-  ClientWidth = 474
+  ClientHeight = 550
+  ClientWidth = 909
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
@@ -12,7 +12,140 @@ object Form1: TForm1
   object OpenDialog1: TOpenDialog
     DefaultExt = '*.pdf'
     Filter = '*.pdf|*.pdf'
-    Left = 32
-    Top = 16
+    Left = 88
+    Top = 104
+  end
+  object ListViewAttachments: TListView
+    ItemAppearanceClassName = 'TListItemAppearance'
+    ItemEditAppearanceClassName = 'TListItemShowCheckAppearance'
+    HeaderAppearanceClassName = 'TListHeaderObjects'
+    FooterAppearanceClassName = 'TListHeaderObjects'
+    Align = Bottom
+    Position.Y = 500.000000000000000000
+    Size.Width = 909.000000000000000000
+    Size.Height = 50.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    OnDblClick = ListViewAttachmentsDblClick
+  end
+  object Layout1: TLayout
+    Align = Top
+    Size.Width = 909.000000000000000000
+    Size.Height = 25.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+  end
+  object btnPrev: TButton
+    Position.X = 8.000000000000000000
+    Position.Y = 3.000000000000000000
+    TabOrder = 8
+    Text = '<'
+    TextSettings.Trimming = None
+    OnClick = btnPrevClick
+  end
+  object btnNext: TButton
+    Position.X = 88.000000000000000000
+    Position.Y = 3.000000000000000000
+    TabOrder = 7
+    Text = '>'
+    TextSettings.Trimming = None
+    OnClick = btnNextClick
+  end
+  object btnHighlight: TButton
+    Position.X = 176.000000000000000000
+    Position.Y = 3.000000000000000000
+    Size.Width = 72.000000000000000000
+    Size.Height = 22.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 6
+    Text = 'Highlight'
+    TextSettings.Trimming = None
+    OnClick = btnHighlightClick
+  end
+  object btnScale: TButton
+    Position.X = 248.000000000000000000
+    Position.Y = 3.000000000000000000
+    Size.Width = 57.000000000000000000
+    Size.Height = 22.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 5
+    Text = 'Scale'
+    TextSettings.Trimming = None
+    OnClick = btnScaleClick
+  end
+  object btnPrint: TButton
+    Position.X = 304.000000000000000000
+    Position.Y = 3.000000000000000000
+    Size.Width = 57.000000000000000000
+    Size.Height = 22.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 4
+    Text = 'Print'
+    TextSettings.Trimming = None
+    OnClick = btnPrintClick
+  end
+  object btnAddAnnotation: TButton
+    Position.X = 360.000000000000000000
+    Position.Y = 3.000000000000000000
+    Size.Width = 57.000000000000000000
+    Size.Height = 22.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 3
+    Text = 'Annot'
+    TextSettings.Trimming = None
+    OnClick = btnAddAnnotationClick
+  end
+  object chkLCDOptimize: TCheckBox
+    Position.X = 425.000000000000000000
+    Position.Y = 3.000000000000000000
+    Size.Width = 96.000000000000000000
+    Size.Height = 19.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 9
+    Text = 'LCDOptimize'
+    OnClick = chkLCDOptimizeClick
+  end
+  object chkSmoothScroll: TCheckBox
+    Position.X = 520.000000000000000000
+    Position.Y = 3.000000000000000000
+    TabOrder = 10
+    Text = 'SmoothScroll'
+  end
+  object edtZoom: TSpinBox
+    Touch.InteractiveGestures = [LongTap, DoubleTap]
+    TabOrder = 11
+    Cursor = crIBeam
+    Min = 1.000000000000000000
+    Max = 10000.000000000000000000
+    Value = 100.000000000000000000
+    Position.X = 624.000000000000000000
+    Position.Y = 3.000000000000000000
+    Size.Width = 73.000000000000000000
+    Size.Height = 22.000000000000000000
+    Size.PlatformDefault = False
+    OnChange = edtZoomChange
+  end
+  object chkChangePageOnMouseScrolling: TCheckBox
+    Position.X = 705.000000000000000000
+    Position.Y = 3.000000000000000000
+    Size.Width = 193.000000000000000000
+    Size.Height = 19.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 12
+    Text = 'ChangePageOnMouseScrolling'
+    OnClick = chkChangePageOnMouseScrollingClick
+  end
+  object PrintDialog1: TPrintDialog
+    MinPage = 1
+    MaxPage = 10
+    Options = [poPageNums]
+    Left = 96
+    Top = 56
+  end
+  object SaveDialog1: TSaveDialog
+    Options = [ofOverwritePrompt, ofHideReadOnly, ofPathMustExist, ofCreatePrompt, ofEnableSizing]
+    Title = 'Save attachment'
+    Left = 160
+    Top = 56
   end
 end
