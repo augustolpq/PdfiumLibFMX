@@ -7,7 +7,7 @@ uses
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
   FMX.ListView.Types, FMX.ListView.Appearances, FMX.ListView.Adapters.Base,
   FMX.Edit, FMX.EditBox, FMX.SpinBox, FMX.StdCtrls, FMX.Controls.Presentation,
-  FMX.Layouts, FMX.ListView, PdfiumCore, PdfiumCtrlFMX, FMX.Printer;
+  FMX.Layouts, FMX.ListView, PdfiumCore, PdfiumCtrlFMX, FMX.Printer, TypInfo;
 
 type
   TForm1 = class(TForm)
@@ -178,7 +178,7 @@ begin
     FCtrl.ScaleMode := Low(FCtrl.ScaleMode)
   else
     FCtrl.ScaleMode := Succ(FCtrl.ScaleMode);
-//  Caption := GetEnumName(TypeInfo(TPdfControlScaleMode), Ord(FCtrl.ScaleMode));
+  Caption := GetEnumName(TypeInfo(TPdfControlScaleMode), Ord(FCtrl.ScaleMode));
 end;
 
 procedure TForm1.chkLCDOptimizeChange(Sender: TObject);
