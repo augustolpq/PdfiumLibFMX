@@ -110,6 +110,8 @@ type
     FVertScrollPos: Integer;
     FAniHorzScrollPos: Single;
     FAniVertScrollPos: Single;
+    FScrollTimerObj: TTimer;
+    FLastMouseMovePos: TPointF;
 
     FOnWebLinkClick: TPdfControlWebLinkClickEvent;
     FOnAnnotationLinkClick: TPdfControlAnnotationLinkClickEvent;
@@ -119,6 +121,7 @@ type
 
     procedure SetAniHorzScrollPos(const Value: Single);
     procedure SetAniVertScrollPos(const Value: Single);
+    procedure OnScrollTimer(Sender: TObject);
 
 
     {$IFDEF MSWINDOWS}
@@ -558,11 +561,16 @@ begin
   FDocument := TPdfDocument.Create;
   InitDocument;
 
+  FScrollTimerObj := TTimer.Create(Self);
+  FScrollTimerObj.Enabled := False;
+  FScrollTimerObj.Interval := cScrollTimerInterval;
+  FScrollTimerObj.OnTimer := OnScrollTimer;
+
 //  ParentDoubleBuffered := False;
 //  ParentBackground := False;
 //  ParentColor := False;
   TabStop := True;
-//  Color := clGray;
+  CanFocus := True;
   Width := 130;
   Height := 180;
 end;
@@ -571,6 +579,7 @@ destructor TPdfControl.Destroy;
 begin
   FPageBitmap.Free;
   FreeAndNil(FWebLinkInfo);	
+  FreeAndNil(FScrollTimerObj);
   FDocument.Free;
   inherited Destroy;
 end;
@@ -834,6 +843,9 @@ begin
 end;
 
 function TPdfControl.InternSetPageIndex(Value: Integer; ScrollTransition, InverseScrollTransition: Boolean): Boolean;
+var
+  OldPageIndex: Integer;
+  TargetY: Integer;
 begin
   if Value >= PageCount then
     Value := PageCount - 1;
@@ -849,9 +861,32 @@ begin
     begin
       FDocument.Pages[FPageIndex].Close;
     end;
+    OldPageIndex := FPageIndex;
     FPageIndex := Value;
-    // Simplified scrolling for FMX
+    
     PageContentChanged(False);
+
+    if ScrollTransition then
+    begin
+      if InverseScrollTransition then
+      begin
+        if FPageIndex < OldPageIndex then
+          TargetY := 0
+        else
+          TargetY := Round(Max(0, FDrawHeight - Height));
+      end
+      else
+      begin
+        if FPageIndex > OldPageIndex then
+          TargetY := 0
+        else
+          TargetY := Round(Max(0, FDrawHeight - Height));
+      end;
+      ScrollContentTo(FHorzScrollPos, TargetY, SmoothScroll);
+    end
+    else
+      ScrollContentTo(0, 0, False);
+
     Result := True;
   end
   else
@@ -862,20 +897,14 @@ function TPdfControl.GotoNextPage(ScrollTransition: Boolean): Boolean;
 begin
   Result := PageIndex < PageCount - 1;
   if Result then
-  begin
     InternSetPageIndex(PageIndex + 1, ScrollTransition, False);
-    ScrollContentTo(0, 0);
-  end;
 end;
 
 function TPdfControl.GotoPrevPage(ScrollTransition: Boolean): Boolean;
 begin
   Result := PageIndex > 0;
   if Result then
-  begin
     InternSetPageIndex(PageIndex - 1, ScrollTransition, False);
-    ScrollContentTo(0, 0);
-  end;
 end;
 
 procedure TPdfControl.PageChange;
@@ -1157,6 +1186,13 @@ begin
   if Page <> nil then
   begin
     PagePt := DeviceToPage(Round(X), Round(Y));
+    
+    // Boundary check for PagePt to ensure CharIndex always finds something when outside
+    if PagePt.Y < 0 then PagePt.Y := 0;
+    if PagePt.Y > Page.Height then PagePt.Y := Page.Height;
+    if PagePt.X < 0 then PagePt.X := 0;
+    if PagePt.X > Page.Width then PagePt.X := Page.Width;
+
     CharIndex := Page.GetCharIndexAt(PagePt.X, PagePt.Y, MAXWORD, MAXWORD);
     Result := CharIndex >= 0;
     if not Result then
@@ -1187,7 +1223,9 @@ begin
     StopScrollTimer;
     SetFocus;
     FMousePressed := True;
-    FMouseDownPt := Point(Round(X), Round(Y)); // used to find out if the selection must be cleared or not
+    if Root <> nil then
+      Root.Captured := Self;
+    FMouseDownPt := Point(Round(X), Round(Y));
   end;
 
   Page := CurrentPage;
@@ -1244,6 +1282,8 @@ begin
       if FMousePressed and (Button = TMouseButton.mbLeft) then
       begin
         FMousePressed := False;
+        if Root <> nil then
+          Root.Captured := nil;
         StopScrollTimer;
       end;
       Exit;
@@ -1257,6 +1297,8 @@ begin
     if Button = TMouseButton.mbLeft then
     begin
       FMousePressed := False;
+      if Root <> nil then
+        Root.Captured := nil;
       StopScrollTimer;
       if AllowUserTextSelection and not FFormFieldFocused then
         SetSelStopCharIndex(X, Y);
@@ -1327,15 +1369,15 @@ begin
     begin
       if FMousePressed then
       begin
+        FLastMouseMovePos := PointF(X, Y);
         // Auto scroll
         if ((Y < 0) or (Y > Height)) or
            ((X < 0) or (X > Width)) then
         begin
-          if ScrollTimer and not FScrollTimerActive then
+          if ScrollTimer then
           begin
-            // SetTimer is Windows specific, FMX needs TTimer or similar
-            // For now, let's just mark it active
             FScrollTimerActive := True;
+            FScrollTimerObj.Enabled := True;
           end;
         end
         else
@@ -1680,7 +1722,9 @@ end;
 procedure TPdfControl.KeyDown(var Key: Word; var KeyChar: WideChar; Shift: TShiftState);
 var
   XOffset, YOffset: Single;
+  Handled: Boolean;
 begin
+  Handled := False;
   inherited KeyDown(Key, KeyChar, Shift);
   
   if AllowFormEvents and IsPageValid then
@@ -1739,13 +1783,32 @@ begin
 
     vkPrior, vkNext:
       begin
-        if AllowUserPageChange then
+        if (FDrawHeight <= Height) and AllowUserPageChange then
         begin
           if Key = vkNext then
-            GotoNextPage(True)
+            Handled := GotoNextPage(True)
           else
-            GotoPrevPage(True);
+            Handled := GotoPrevPage(True);
+        end
+        else
+        begin
+          if Key = vkNext then
+          begin
+            if AllowUserPageChange and (FVertScrollPos >= FDrawHeight - Height) then
+              Handled := GotoNextPage(True)
+            else
+              YOffset := Height;
+          end
+          else
+          begin
+            if AllowUserPageChange and (FVertScrollPos <= 0) then
+              Handled := GotoPrevPage(True)
+            else
+              YOffset := -Height;
+          end;
         end;
+        if Handled or (YOffset <> 0) then
+          Key := 0;
       end;
 
     vkHome, vkEnd:
@@ -1753,18 +1816,34 @@ begin
         if ssCtrl in Shift then
         begin
           if Key = vkHome then
-            InternSetPageIndex(0, True, True)
+            Handled := InternSetPageIndex(0, True, True)
           else
-            InternSetPageIndex(PageCount - 1, True, True);
+            Handled := InternSetPageIndex(PageCount - 1, True, True);
+        end
+        else
+        begin
+          if ssShift in Shift then
+          begin
+            if Key = vkEnd then
+              XOffset := FDrawWidth
+            else
+              XOffset := -FDrawWidth;
+          end
+          else
+          begin
+            if Key = vkEnd then
+              YOffset := FDrawHeight
+            else
+              YOffset := -FDrawHeight;
+          end;
         end;
+        if Handled or (XOffset <> 0) or (YOffset <> 0) then
+          Key := 0;
       end;
   end;
 
   if (XOffset <> 0) or (YOffset <> 0) then
-  begin
     ScrollContent(Round(XOffset), Round(YOffset), SmoothScroll);
-    Key := 0;
-  end;
 end;
 
 procedure TPdfControl.KeyUp(var Key: Word; var KeyChar: WideChar; Shift: TShiftState);
@@ -2242,21 +2321,44 @@ begin
       if not Handled and FChangePageOnMouseScrolling then
       begin
         if WheelDelta < 0 then
-          GotoNextPage()
-        else if PageIndex > 0 then
-        begin
-          GotoPrevPage();
-          ScrollContentTo(0, MaxInt);
-        end;
-        Handled := True;
+          Handled := GotoNextPage(True)
+        else
+          Handled := GotoPrevPage(True);
       end;
     end;
+  end;
+end;
+
+procedure TPdfControl.OnScrollTimer(Sender: TObject);
+var
+  XOffset, YOffset: Integer;
+begin
+  XOffset := 0;
+  YOffset := 0;
+
+  if FLastMouseMovePos.Y < 0 then
+    YOffset := -Round(cDefaultScrollOffset * 1.5)
+  else if FLastMouseMovePos.Y > Height then
+    YOffset := Round(cDefaultScrollOffset * 1.5);
+
+  if FLastMouseMovePos.X < 0 then
+    XOffset := -Round(cDefaultScrollOffset * 1.5)
+  else if FLastMouseMovePos.X > Width then
+    XOffset := Round(cDefaultScrollOffset * 1.5);
+
+  if (XOffset <> 0) or (YOffset <> 0) then
+  begin
+    ScrollContent(XOffset, YOffset, False); // Use direct scroll for timer to avoid animation lag
+    if AllowUserTextSelection and not FFormFieldFocused then
+      SetSelStopCharIndex(FLastMouseMovePos.X, FLastMouseMovePos.Y);
   end;
 end;
 
 procedure TPdfControl.StopScrollTimer;
 begin
   FScrollTimerActive := False;
+  if Assigned(FScrollTimerObj) then
+    FScrollTimerObj.Enabled := False;
 end;
 
 procedure TPdfControl.HightlightText(const SearchText: string; MatchCase, MatchWholeWord: Boolean);
