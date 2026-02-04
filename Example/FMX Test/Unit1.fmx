@@ -133,7 +133,7 @@ object Form1: TForm1
     Size.PlatformDefault = False
     TabOrder = 12
     Text = 'ChangePageOnMouseScrolling'
-    OnClick = chkChangePageOnMouseScrollingClick
+    OnChange = chkChangePageOnMouseScrollingChange
   end
   object PrintDialog1: TPrintDialog
     MinPage = 1

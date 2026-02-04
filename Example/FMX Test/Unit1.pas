@@ -31,12 +31,12 @@ type
     procedure btnNextClick(Sender: TObject);
     procedure btnHighlightClick(Sender: TObject);
     procedure btnScaleClick(Sender: TObject);
-    procedure chkChangePageOnMouseScrollingClick(Sender: TObject);
     procedure chkLCDOptimizeClick(Sender: TObject);
     procedure edtZoomChange(Sender: TObject);
     procedure btnPrintClick(Sender: TObject);
     procedure ListViewAttachmentsDblClick(Sender: TObject);
     procedure btnAddAnnotationClick(Sender: TObject);
+    procedure chkChangePageOnMouseScrollingChange(Sender: TObject);
   private
     FCtrl: TPdfControl;
     procedure WebLinkClick(Sender: TObject; Url: string);
@@ -193,7 +193,7 @@ begin
   FCtrl.ZoomPercentage := Trunc(edtZoom.Value);
 end;
 
-procedure TForm1.chkChangePageOnMouseScrollingClick(Sender: TObject);
+procedure TForm1.chkChangePageOnMouseScrollingChange(Sender: TObject);
 begin
   FCtrl.ChangePageOnMouseScrolling := chkChangePageOnMouseScrolling.IsChecked;
 end;
