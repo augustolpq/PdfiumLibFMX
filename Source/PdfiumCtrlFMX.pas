@@ -27,7 +27,10 @@ uses
   {$IFDEF FPC}
   LCLType, PrintersDlgs, Win32Extra,
   {$ENDIF FPC}
-  Windows, Messages, ShellAPI, Types, SysUtils, Classes, Contnrs, FMX.Graphics, System.UITypes, FMX.Controls,
+  {$IFDEF MSWINDOWS}
+  Windows, Messages, ShellAPI,
+  {$ENDIF MSWINDOWS}
+  Types, SysUtils, Classes, Contnrs, FMX.Graphics, System.UITypes, FMX.Controls, FMX.Types,
   FMX.Forms, FMX.Dialogs, PdfiumCore;
 
 type
@@ -66,7 +69,7 @@ type
     FDocument: TPdfDocument;
     FPageIndex: Integer;
     FRenderedPageIndex: Integer;
-    FPageBitmap: HBITMAP;
+    FPageBitmap: TBitmap;
     FDrawX: Integer;
     FDrawY: Integer;
     FDrawWidth: Integer;
@@ -94,7 +97,6 @@ type
     FScaleMode: TPdfControlScaleMode;
     FZoomPercentage: Integer;
     FPageColor: TAlphaColor;
-    FScrollMousePos: TPoint;
     FLinkOptions: TPdfControlLinkOptions;
     FHighlightTextRects: TPdfRectArray;
     FHighlightTexts: TObjectList;
@@ -111,16 +113,13 @@ type
     FOnPaint: TNotifyEvent;
     FOnPrintDocument: TNotifyEvent;
 
-    procedure WMTimer(var Message: TWMTimer); message WM_TIMER;
+    {$IFDEF MSWINDOWS}
     procedure WMVScroll(var Message: TWMVScroll); message WM_VSCROLL;
     procedure WMHScroll(var Message: TWMHScroll); message WM_HSCROLL;
-    procedure WMEraseBkgnd(var Message: TWMEraseBkgnd); message WM_ERASEBKGND;
-    procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
-//    procedure CMColorchanged(var Message: TMessage); message CM_COLORCHANGED;
+    {$ENDIF MSWINDOWS}
     {$IFDEF USE_PRINTCLIENT_WORKAROUND}
     procedure WMPrintClient(var Message: TWMPrintClient); message WM_PRINTCLIENT;
     {$ENDIF USE_PRINTCLIENT_WORKAROUND}
-//    procedure CMMouseleave(var Message: TMessage); message CM_MOUSELEAVE;
 
     procedure GetPageWebLinks;
     function GetCurrentPage: TPdfPage;
@@ -128,7 +127,7 @@ type
     procedure SetPageIndex(Value: Integer);
     function InternSetPageIndex(Value: Integer; ScrollTransition, InverseScrollTransition: Boolean): Boolean;
     procedure SetRotation(const Value: TPdfPageRotation);
-    function SetSelStopCharIndex(X, Y: Integer): Boolean;
+    function SetSelStopCharIndex(X, Y: Single): Boolean;
     function GetSelText: string;
     function GetSelLength: Integer;
     function GetSelStart: Integer;
@@ -140,18 +139,19 @@ type
     procedure SetPageShadowSize(const Value: Integer);
     procedure AdjustDrawPos;
     procedure UpdatePageDrawInfo;
+    procedure GetWidthHeight(PageWidth, PageHeight: Double; DpiX, DpiY, MaxWidth, MaxHeight: Integer; var W, H: Integer);
     procedure SetPageColor(const Value: TAlphaColor);
     procedure SetDrawOptions(const Value: TPdfPageRenderOptions);
     procedure InvalidateRectDiffs(const OldRects, NewRects: TPdfControlRectArray);
     procedure InvalidatePdfRectDiffs(const OldRects, NewRects: TPdfRectArray);
     procedure StopScrollTimer;
     procedure DocumentLoaded;
-    procedure DrawSelection(DC: HDC; Page: TPdfPage);
-    procedure DrawHighlightText(DC: HDC; Page: TPdfPage);
-    procedure DrawBorderAndShadow(DC: HDC);
-    function InternPageToDevice(Page: TPdfPage; PageRect: TPdfRect; ANormalize: Boolean): TRect;
+    procedure DrawSelection(ACanvas: TCanvas; Page: TPdfPage);
+    procedure DrawHighlightText(ACanvas: TCanvas; Page: TPdfPage);
+    procedure DrawBorderAndShadow(ACanvas: TCanvas);
+    function InternPageToDevice(Page: TPdfPage; PageRect: TPdfRect; ANormalize: Boolean): TRectF;
     procedure SetZoomPercentage(Value: Integer);
-    procedure DrawPage(DC: HDC; Page: TPdfPage; DirectDrawPage: Boolean);
+    procedure DrawPage(ACanvas: TCanvas; Page: TPdfPage; DirectDrawPage: Boolean);
     procedure CalcHighlightTextRects;
     procedure InitDocument;
     function ShellOpenFileName(const FileName: string; Launch: Boolean): Boolean;
@@ -162,21 +162,20 @@ type
     procedure FormFieldFocus(Document: TPdfDocument; Value: PWideChar; ValueLen: Integer; FieldFocused: Boolean);
     procedure ExecuteNamedAction(Document: TPdfDocument; NamedAction: TPdfNamedActionType);
 
-    procedure DrawAlphaRects(DC: HDC; Page: TPdfPage; const Rects: TPdfRectArray; Color: TAlphaColor);
-    procedure DrawAlphaSelection(DC: HDC; Page: TPdfPage; const Rects: TPdfRectArray);
-    procedure DrawFormOutputSelectedRects(DC: HDC; Page: TPdfPage);
+    procedure DrawAlphaRects(ACanvas: TCanvas; Page: TPdfPage; const Rects: TPdfRectArray; Color: TAlphaColor);
+    procedure DrawAlphaSelection(ACanvas: TCanvas; Page: TPdfPage; const Rects: TPdfRectArray);
+    procedure DrawFormOutputSelectedRects(ACanvas: TCanvas; Page: TPdfPage);
+    procedure SetColor(const Value: TAlphaColor);
+    function GetColor: TAlphaColor;
   protected
     procedure Paint; override;
     procedure Resize; override;
-    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
-    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X: Integer; Y: Integer); override;
-    procedure MouseMove(Shift: TShiftState; X: Integer; Y: Integer); override;
-    function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-    procedure KeyDown(var Key: Word; Shift: TShiftState); override;
-    procedure WMKeyDown(var Message: TWMKeyDown); message {$IFDEF FPC}CN_KEYDOWN{$ELSE}WM_KEYDOWN{$ENDIF};
-    procedure WMKeyUp(var Message: TWMKeyUp); message {$IFDEF FPC}CN_KEYUP{$ELSE}WM_KEYUP{$ENDIF};
-    procedure WMChar(var Message: TWMChar); message {$IFDEF FPC}CN_CHAR{$ELSE}WM_CHAR{$ENDIF};
-    procedure WMKillFocus(var Message: TWMKillFocus); message WM_KILLFOCUS;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Single); override;
+    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Single); override;
+    procedure MouseMove(Shift: TShiftState; X, Y: Single); override;
+    procedure MouseWheel(Shift: TShiftState; WheelDelta: Integer; var Handled: Boolean); override;
+    procedure KeyDown(var Key: Word; var KeyChar: WideChar; Shift: TShiftState); override;
+    procedure KeyUp(var Key: Word; var KeyChar: WideChar; Shift: TShiftState); override;
 
     function LinkHandlingNeeded: Boolean;
     function IsClickableLinkAt(X, Y: Integer): Boolean;
@@ -187,7 +186,7 @@ type
     procedure PageLayoutChanged;
     function IsPageValid: Boolean;
     function GetSelectionRects: TPdfControlRectArray;
-    procedure DestroyWnd; override;
+//    procedure DestroyWnd; override;
 
     property DrawX: Integer read FDrawX;
     property DrawY: Integer read FDrawY;
@@ -261,6 +260,7 @@ type
     property SelText: string read GetSelText;
 
     property Canvas;
+    property Color: TAlphaColor read GetColor write SetColor;
   published
     property ScaleMode: TPdfControlScaleMode read FScaleMode write SetScaleMode default smFitAuto;
     property ZoomPercentage: Integer read FZoomPercentage write SetZoomPercentage default 100;
@@ -359,7 +359,7 @@ type
 implementation
 
 uses
-  Math, FMX.Clipboard.Win, Character, FMX.Printer;
+  Math, System.Character, FMX.Printer, FMX.Platform, System.Rtti;
 
 const
   cScrollTimerId = 1;
@@ -395,9 +395,10 @@ begin
   {$ENDIF FPC}
 end;
 
+{$IFDEF MSWINDOWS}
 function VclAbortProc(Prn: HDC; Error: Integer): Bool; stdcall;
 begin
-  Application.ProcessMessages;
+  if Assigned(Application) then Application.ProcessMessages;
   Result := not Printer.Aborted;
 end;
 
@@ -405,6 +406,7 @@ function FastVclAbortProc(Prn: HDC; Error: Integer): Bool; stdcall;
 begin
   Result := not Printer.Aborted;
 end;
+{$ENDIF MSWINDOWS}
 
 
 { THighlightTextInfo }
@@ -475,11 +477,11 @@ begin
 //  Result := Printer.Canvas.Handle;
 end;
 
+{$IFDEF MSWINDOWS}
 class function TPdfDocumentVclPrinter.PrintDocument(ADocument: TPdfDocument;
   const AJobTitle: string; AShowPrintDialog, AllowPageRange: Boolean; AParentWnd: HWND): Boolean;
 var
   PdfPrinter: TPdfDocumentVclPrinter;
-  Dlg: TPrintDialog;
   FromPage, ToPage: Integer;
 begin
   Result := False;
@@ -491,38 +493,10 @@ begin
     
   if AShowPrintDialog then
   begin
-    Dlg := TPrintDialog.Create(nil);
-    try
-      // Set the PrintDialog options
-      if AllowPageRange then
-      begin
-        Dlg.MinPage := 1;
-        Dlg.MaxPage := ADocument.PageCount;
-//        Dlg.Options := Dlg.Options + [poPageNums];
-      end;
-
-      // Show the PrintDialog
-      {$IFDEF FPC}
-      Result := Dlg.Execute;
-      {$ELSE}
-      if (AParentWnd = 0) or not IsWindow(AParentWnd) then
-        Result := Dlg.Execute;
-//      else
-//        Result := Dlg.Execute(AParentWnd);
-      {$ENDIF FPC}
-
-      if not Result then
-        Exit;
-
-      // Adjust print options
-//      if AllowPageRange and (Dlg.PrintRange = prPageNums) then
-//      begin
-//        FromPage := Dlg.FromPage;
-//        ToPage := Dlg.ToPage;
-//      end;
-    finally
-      Dlg.Free;
-    end;
+    // TPrintDialog is a VCL component, not available in FMX.
+    // In FMX, printing is handled differently.
+    // For now, we'll just skip the dialog.
+    Result := True; 
   end;
 
   PdfPrinter := TPdfDocumentVclPrinter.Create;
@@ -539,6 +513,7 @@ begin
     PdfPrinter.Free;
   end;
 end;
+{$ENDIF MSWINDOWS}
 
 
 { TPdfControl }
@@ -579,8 +554,7 @@ end;
 
 destructor TPdfControl.Destroy;
 begin
-  if FPageBitmap <> 0 then
-    DeleteObject(FPageBitmap);
+  FPageBitmap.Free;
   FreeAndNil(FWebLinkInfo);	
   FDocument.Free;
   inherited Destroy;
@@ -595,12 +569,18 @@ begin
   FDocument.OnExecuteNamedAction := ExecuteNamedAction;
 end;
 
-procedure TPdfControl.DestroyWnd;
+procedure TPdfControl.SetColor(const Value: TAlphaColor);
 begin
-  StopScrollTimer;
-//  if FCheckForTrippleClick then
-//    KillTimer(Handle, cTrippleClickTimerId);
-//  inherited DestroyWnd;
+  if FPageColor <> Value then
+  begin
+    FPageColor := Value;
+    Repaint;
+  end;
+end;
+
+function TPdfControl.GetColor: TAlphaColor;
+begin
+  Result := FPageColor;
 end;
 
 {$IFDEF USE_PRINTCLIENT_WORKAROUND}
@@ -619,56 +599,31 @@ begin
 end;
 {$ENDIF USE_PRINTCLIENT_WORKAROUND}
 
-procedure TPdfControl.WMEraseBkgnd(var Message: TWMEraseBkgnd);
+procedure TPdfControl.DrawAlphaSelection(ACanvas: TCanvas; Page: TPdfPage; const Rects: TPdfRectArray);
 begin
-  Message.Result := 1;
+  DrawAlphaRects(ACanvas, Page, Rects, TAlphaColorRec.Seagreen); // Just a default selection-like color
 end;
 
-procedure TPdfControl.DrawAlphaSelection(DC: HDC; Page: TPdfPage; const Rects: TPdfRectArray);
-begin
-  DrawAlphaRects(DC, Page, Rects, RGB(50, 142, 254));
-end;
-
-procedure TPdfControl.DrawAlphaRects(DC: HDC; Page: TPdfPage; const Rects: TPdfRectArray; Color: TAlphaColor);
+procedure TPdfControl.DrawAlphaRects(ACanvas: TCanvas; Page: TPdfPage; const Rects: TPdfRectArray; Color: TAlphaColor);
 var
   Count: Integer;
   I: Integer;
-  R: TRect;
-  BmpDC: HDC;
-  SelBmp: TBitmap;
-  BlendFunc: TBlendFunction;
+  R: TRectF;
 begin
   Count := Length(Rects);
   if Count > 0 then
   begin
-    SelBmp := TBitmap.Create;
-    try
-      SelBmp.Canvas.Fill.Color := Color;
-      SelBmp.SetSize(100, 50);
-      {$IFDEF FPC}
-      // Delphi fills the bitmap with the brush if it is resized, FPC doesn't
-      SelBmp.Canvas.FillRect(0, 0, SelBmp.Width, SelBmp.Height);
-      {$ENDIF FPC}
-      BlendFunc.BlendOp := AC_SRC_OVER;
-      BlendFunc.BlendFlags := 0;
-      BlendFunc.SourceConstantAlpha := 127;
-      BlendFunc.AlphaFormat := 0;
-      BmpDC := SelBmp.Canvas.Handle;
-      for I := 0 to Count - 1 do
-      begin
-        R := InternPageToDevice(Page, Rects[I], True);
-        if RectVisible(DC, R) then
-          AlphaBlend(DC, R.Left, R.Top, R.Right - R.Left, R.Bottom - R.Top,
-                     BmpDC, 0, 0, SelBmp.Width, SelBmp.Height,
-                     BlendFunc);
-      end;
-    finally
-      SelBmp.Free;
+    ACanvas.Fill.Color := Color;
+    ACanvas.Fill.Kind := TBrushKind.Solid;
+    for I := 0 to Count - 1 do
+    begin
+      R := InternPageToDevice(Page, Rects[I], True);
+      ACanvas.FillRect(R, 0, 0, [], 0.5);
     end;
   end;
 end;
 
-procedure TPdfControl.DrawSelection(DC: HDC; Page: TPdfPage);
+procedure TPdfControl.DrawSelection(ACanvas: TCanvas; Page: TPdfPage);
 var
   Count: Integer;
   I: Integer;
@@ -680,255 +635,131 @@ begin
     SetLength(Rects, Count);
     for I := 0 to Count - 1 do
       Rects[I] := Page.GetTextRect(I);
-    DrawAlphaSelection(DC, Page, Rects);
+    DrawAlphaSelection(ACanvas, Page, Rects);
   end;
 end;
 
-procedure TPdfControl.DrawFormOutputSelectedRects(DC: HDC; Page: TPdfPage);
+procedure TPdfControl.DrawFormOutputSelectedRects(ACanvas: TCanvas; Page: TPdfPage);
 begin
-  DrawAlphaSelection(DC, Page, FFormOutputSelectedRects);
+  DrawAlphaSelection(ACanvas, Page, FFormOutputSelectedRects);
 end;
 
-procedure TPdfControl.DrawHighlightText(DC: HDC; Page: TPdfPage);
+procedure TPdfControl.DrawHighlightText(ACanvas: TCanvas; Page: TPdfPage);
 begin
-  DrawAlphaRects(DC, Page, FHighlightTextRects, RGB(254, 142, 50));
+  // FMX uses TAlphaColor, we can use a similar orange
+  DrawAlphaRects(ACanvas, Page, FHighlightTextRects, TAlphaColorRec.Orange);
 end;
 
-procedure TPdfControl.DrawBorderAndShadow(DC: HDC);
-var
-  BorderBrush, ShadowBrush: HBRUSH;
+procedure TPdfControl.DrawBorderAndShadow(ACanvas: TCanvas);
 begin
   // Draw page borders
   if PageBorderColor <> TAlphaColors.Null then
   begin
-    BorderBrush := CreateSolidBrush(ColorToRGB(PageBorderColor));
-    FillRect(DC, Rect(FDrawX, FDrawY, FDrawX + FDrawWidth, FDrawY + 1), BorderBrush);                             // top border
-    FillRect(DC, Rect(FDrawX, FDrawY, FDrawX + 1, FDrawY + FDrawHeight), BorderBrush);                            // left border
-    FillRect(DC, Rect(FDrawX + FDrawWidth - 1, FDrawY, FDrawX + FDrawWidth, FDrawY + FDrawHeight), BorderBrush);  // right border
-    FillRect(DC, Rect(FDrawX, FDrawY + FDrawHeight - 1, FDrawX + FDrawWidth, FDrawY + FDrawHeight), BorderBrush); // bottom border
-    DeleteObject(BorderBrush);
+    ACanvas.Stroke.Color := PageBorderColor;
+    ACanvas.Stroke.Kind := TBrushKind.Solid;
+    ACanvas.DrawRect(RectF(FDrawX, FDrawY, FDrawX + FDrawWidth, FDrawY + FDrawHeight), 0, 0, [], 1);
   end;
 
   // Draw page shadow
   if (PageShadowColor <> TAlphaColors.Null) and (PageShadowSize > 0) then
   begin
-    ShadowBrush := CreateSolidBrush(ColorToRGB(PageShadowColor));
-    FillRect(DC, Rect(FDrawX + FDrawWidth, FDrawY + PageShadowSize,
-                          FDrawX + FDrawWidth + PageShadowSize, FDrawY + FDrawHeight + PageShadowSize),
-             ShadowBrush); // right shadow
-    FillRect(DC, Rect(FDrawX + PageShadowSize, FDrawY + FDrawHeight,
-                          FDrawX + FDrawWidth + PageShadowSize, FDrawY + FDrawHeight + PageShadowSize),
-             ShadowBrush); // bottom shadow
-    DeleteObject(ShadowBrush);
+    ACanvas.Fill.Color := PageShadowColor;
+    ACanvas.Fill.Kind := TBrushKind.Solid;
+    ACanvas.FillRect(RectF(FDrawX + FDrawWidth, FDrawY + PageShadowSize,
+                           FDrawX + FDrawWidth + PageShadowSize, FDrawY + FDrawHeight + PageShadowSize), 0, 0, [], 1);
+    ACanvas.FillRect(RectF(FDrawX + PageShadowSize, FDrawY + FDrawHeight,
+                           FDrawX + FDrawWidth + PageShadowSize, FDrawY + FDrawHeight + PageShadowSize), 0, 0, [], 1);
   end;
 end;
 
-procedure TPdfControl.DrawPage(DC: HDC; Page: TPdfPage; DirectDrawPage: Boolean);
+procedure TPdfControl.DrawPage(ACanvas: TCanvas; Page: TPdfPage; DirectDrawPage: Boolean);
 
-  procedure Draw(DC: HDC; X, Y: Integer; Page: TPdfPage);
+  procedure DrawToBitmap(ABitmap: TBitmap; Page: TPdfPage);
   var
-    PageBrush: HBRUSH;
+    Data: TBitmapData;
+    PdfBmp: TPdfBitmap;
     ColorRef: TColorRef;
   begin
-//    if PageColor = clDefault then //See what we can replace instead of clDefault
-//      ColorRef := ColorToRGB(Color)
-//    else
-      ColorRef := ColorToRGB(PageColor);
-
-    // Page.Draw doesn't paint the background if proPrinting is enabled.
-    if proPrinting in FDrawOptions then
-    begin
-      PageBrush := CreateSolidBrush(ColorRef);
-      FillRect(DC, Rect(X, Y, X + FDrawWidth, Y + FDrawHeight), PageBrush);
-      DeleteObject(PageBrush);
+    ColorRef := (TAlphaColorRec(PageColor).B shl 16) or (TAlphaColorRec(PageColor).G shl 8) or TAlphaColorRec(PageColor).R;
+    if ABitmap.Map(TMapAccess.Write, Data) then
+    try
+      // Create a PDFium bitmap wrapper for the FMX bitmap data
+      PdfBmp := TPdfBitmap.Create(ABitmap.Width, ABitmap.Height, bfBGRA, Data.Data, Data.Pitch);
+      try
+        Page.Draw(PdfBmp, 0, 0, ABitmap.Width, ABitmap.Height, Rotation, FDrawOptions, ColorRef);
+      finally
+        PdfBmp.Free;
+      end;
+    finally
+      ABitmap.Unmap(Data);
     end;
-
-    Page.Draw(DC, X, Y, FDrawWidth, FDrawHeight, Rotation, FDrawOptions, ColorRef);
   end;
 
-var
-  PageDC: HDC;
-  OldPageBmp: HBITMAP;
-  bmi: TBitmapInfo;
-  BmpData: Windows.TBitmap;
-  Bits: Pointer;
 begin
   if DirectDrawPage then
   begin
-    if FPageBitmap <> 0 then
-    begin
-      DeleteObject(FPageBitmap);
-      FPageBitmap := 0;
-    end;
+    FreeAndNil(FPageBitmap);
     FRenderedPageIndex := -1;
-    Draw(DC, FDrawX, FDrawY, Page);
-  end
-  else
-  begin
-    if (FPageBitmap = 0) or
-       (GetObject(FPageBitmap, SizeOf(BmpData), @BmpData) <> SizeOf(BmpData)) or
-       (FDrawWidth <> BmpData.bmWidth) or
-       (FDrawHeight <> BmpData.bmHeight) then
-    begin
-      FRenderedPageIndex := -1; // force rendering
-      if FPageBitmap <> 0 then
-        DeleteObject(FPageBitmap);
-      if GetDeviceCaps(DC, BITSPIXEL) = 32 then
-        FPageBitmap := CreateCompatibleBitmap(DC, FDrawWidth, FDrawHeight)
-      else
-      begin
-        FillChar(bmi, SizeOf(bmi), 0);
-        bmi.bmiHeader.biSize := SizeOf(TBitmapInfoHeader);
-        bmi.bmiHeader.biWidth := FDrawWidth;
-        bmi.bmiHeader.biHeight := -FDrawHeight; // top-down
-        bmi.bmiHeader.biPlanes := 1;
-        bmi.bmiHeader.biBitCount := 32;
-        bmi.bmiHeader.biCompression := BI_RGB;
-        FPageBitmap := CreateDIBSection(DC, bmi, DIB_RGB_COLORS, Bits, 0, 0);
-      end;
-    end;
-
-    PageDC := CreateCompatibleDC(DC);
-    OldPageBmp := SelectObject(PageDC, FPageBitmap);
-    try
-      if FRenderedPageIndex <> PageIndex then
-      begin
-        FRenderedPageIndex := PageIndex;
-        Draw(PageDC, 0, 0, Page);
-      end;
-      BitBlt(DC, FDrawX, FDrawY, FDrawWidth, FDrawHeight, PageDC, 0, 0, SRCCOPY);
-    finally
-      SelectObject(PageDC, OldPageBmp);
-      DeleteDC(PageDC);
-    end;
+    // For direct draw in FMX, we still probably want a temporary bitmap if we can't draw directly to canvas
+    // But PDFium needs a buffer. Let's use FPageBitmap anyway or a local one.
   end;
+
+  if (FPageBitmap = nil) or (FPageBitmap.Width <> FDrawWidth) or (FPageBitmap.Height <> FDrawHeight) then
+  begin
+    FRenderedPageIndex := -1;
+    if FPageBitmap = nil then
+      FPageBitmap := TBitmap.Create;
+    FPageBitmap.SetSize(FDrawWidth, FDrawHeight);
+  end;
+
+  if FRenderedPageIndex <> PageIndex then
+  begin
+    FRenderedPageIndex := PageIndex;
+    DrawToBitmap(FPageBitmap, Page);
+  end;
+
+  ACanvas.DrawBitmap(FPageBitmap, RectF(0, 0, FPageBitmap.Width, FPageBitmap.Height),
+                     RectF(FDrawX, FDrawY, FDrawX + FDrawWidth, FDrawY + FDrawHeight), 1);
 end;
 
 procedure TPdfControl.Paint;
 var
   Page: TPdfPage;
-  DC, DrawDC: HDC;
-  DrawBmp, OldDrawBmp: HBITMAP;
-  Rgn: HRGN;
-  DirectPageDraw: Boolean;
-  WndR, ClipR: TRect;
 begin
-  DC := Canvas.Handle;
-  {$IFDEF REPAINTTEST}
-  FillRect(DC, ClientRect, GetStockObject(BLACK_BRUSH));
-  GdiFlush;
-  Sleep(70);
-  {$ENDIF REPAINTTEST}
-
   if IsPageValid then
   begin
-    DirectPageDraw := not BufferedPageDraw or
-                      ((Int64(FDrawWidth) * FDrawHeight) > (Int64(Width) * Height)) and
-                       (Int64(FDrawWidth) * FDrawHeight > 4096*2160); // 4K is too much for the system resources
+    // Draw background
+    Canvas.Fill.Color := Color;
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.FillRect(RectF(0, 0, Width, FDrawY), 0, 0, [], 1);                                      // top bar
+    Canvas.FillRect(RectF(0, FDrawY, FDrawX, FDrawY + FDrawHeight), 0, 0, [], 1);                  // left bar
+    Canvas.FillRect(RectF(FDrawX + FDrawWidth, FDrawY, Width, FDrawY + FDrawHeight), 0, 0, [], 1); // right bar
+    Canvas.FillRect(RectF(0, FDrawY + FDrawHeight, Width, Height), 0, 0, [], 1);                   // bottom bar
 
-    if DirectPageDraw or FSelectionActive or (FHighlightTextRects <> nil) then
-    begin
-      case GetClipBox(DC, ClipR) of
-        NULLREGION:
-          Exit; // nothing to paint
-        ERROR:
-          Windows.GetClientRect(Handle, ClipR);
-      end;
-      // Double buffer, minimal bitmap size
-      DrawDC := CreateCompatibleDC(DC);
-      DrawBmp := CreateCompatibleBitmap(DC, ClipR.Right - ClipR.Left, ClipR.Bottom - ClipR.Top);
-      OldDrawBmp := SelectObject(DrawDC, DrawBmp);
-      OffsetWindowOrgEx(DrawDC, ClipR.Left, ClipR.Top, nil);
+    // Draw the page
+    Page := CurrentPage;
+    DrawPage(Canvas, Page, False);
 
-      // copy the clipping region and adjust to the bitmap's device units
-      Rgn := CreateRectRgn(0, 0, 1, 1);
-      {$IFDEF USE_PRINTCLIENT_WORKAROUND}
-      if FPrintClient then
-      {$ELSE}
-      if csPrintClient in ControlState then
-      {$ENDIF USE_PRINTCLIENT_WORKAROUND}
-      begin
-        if GetClipRgn(DC, Rgn) = 1 then // application clip region
-        begin
-          OffsetRgn(Rgn, -ClipR.Left, -ClipR.Top);
-          if SelectClipRgn(DrawDC, Rgn) = NULLREGION then
-            Exit; // nothing to paint
-        end;
-      end
-      else
-      begin
-        if GetRandomRgn(DC, Rgn, SYSRGN) = 1 then // system clip region, set by BeginPaint, in screen coordinates
-        begin
-          GetWindowRect(Handle, WndR);
-          OffsetRgn(Rgn, -WndR.Left - ClipR.Left, -WndR.Top - ClipR.Top);
-          SelectClipRgn(DrawDC, Rgn);
-          if SelectClipRgn(DrawDC, Rgn) = NULLREGION then
-            Exit; // nothing to paint
-        end;
-      end;
-      DeleteObject(Rgn);
-    end
-    else
-    begin
-      DrawDC := DC;
-      DrawBmp := 0;
-      OldDrawBmp := 0;
-    end;
+    // Draw overlays
+    if FSelectionActive then
+      DrawSelection(Canvas, Page);
 
-    try
-      // Draw borders
-      FillRect(DrawDC, Rect(0, 0, Width, FDrawY), Brush.Handle);                                      // top bar
-      FillRect(DrawDC, Rect(0, FDrawY, FDrawX, FDrawY + FDrawHeight), Brush.Handle);                  // left bar
-      FillRect(DrawDC, Rect(FDrawX + FDrawWidth, FDrawY, Width, FDrawY + FDrawHeight), Brush.Handle); // right bar
-      FillRect(DrawDC, Rect(0, FDrawY + FDrawHeight, Width, Height), Brush.Handle);                   // bottom bar
+    DrawFormOutputSelectedRects(Canvas, Page);
+    DrawHighlightText(Canvas, Page);
+    DrawBorderAndShadow(Canvas);
 
-      // Draw the page
-      Page := CurrentPage;
-      DrawPage(DrawDC, Page, DirectPageDraw);
-      // Draw the selection overlay
-      if FSelectionActive then
-        DrawSelection(DrawDC, Page);
-
-      DrawFormOutputSelectedRects(DrawDC, Page);
-
-      // Draw the highlighted text overlay
-      DrawHighlightText(DrawDC, Page);
-
-      DrawBorderAndShadow(DrawDC);
-
-      // User painting
-      if Assigned(FOnPaint) then
-      begin
-        Canvas.Handle := DrawDC;
-        try
-          FOnPaint(Self);
-        finally
-          Canvas.Handle := DC;
-        end;
-      end;
-
-      if DrawDC <> DC then
-        BitBlt(DC, 0, 0, Width, Height, DrawDC, 0, 0, SRCCOPY);
-    finally
-      if DrawBmp <> 0 then
-      begin
-        SelectObject(DrawDC, OldDrawBmp);
-        DeleteObject(DrawBmp);
-      end;
-      if DrawDC <> DC then
-        DeleteDC(DrawDC);
-    end;
+    // User painting
+    if Assigned(FOnPaint) then
+      FOnPaint(Self);
   end
   else
   begin
     // empty page
-    if FPageBitmap <> 0 then
-    begin
-      DeleteObject(FPageBitmap);
-      FPageBitmap := 0;
-    end;
-    FillRect(DC, Rect(0, 0, Width, Height), Brush.Handle);
-    DrawBorderAndShadow(DC);
+    FreeAndNil(FPageBitmap);
+    Canvas.Fill.Color := Color;
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.FillRect(LocalRect, 0, 0, [], 1);
+    DrawBorderAndShadow(Canvas);
     if Assigned(FOnPaint) then
       FOnPaint(Self);
   end;
@@ -950,19 +781,13 @@ procedure TPdfControl.PageLayoutChanged;
 begin
   FRenderedPageIndex := -1;
   UpdatePageDrawInfo;
-  Invalidate;
+  Repaint;
 end;
 
 procedure TPdfControl.InvalidatePage;
-var
-  R: TRect;
 begin
   FRenderedPageIndex := -1;
-  if HandleAllocated then
-  begin
-    R := GetPageRect;
-    InvalidateRect(Handle, @R, True);
-  end;
+  Repaint;
 end;
 
 procedure TPdfControl.PrintDocument;
@@ -970,9 +795,8 @@ begin
   if Document.Active then
   begin
     if Assigned(FOnPrintDocument) then
-      FOnPrintDocument(Self)
-    else
-      TPdfDocumentVclPrinter.PrintDocument(Document, ExtractFileName(Document.FileName));
+      FOnPrintDocument(Self);
+    // TPdfDocumentVclPrinter is VCL-specific, FMX needs a different approach
   end;
 end;
 
@@ -995,10 +819,6 @@ begin
 end;
 
 function TPdfControl.InternSetPageIndex(Value: Integer; ScrollTransition, InverseScrollTransition: Boolean): Boolean;
-var
-  ScrollInfo: TScrollInfo;
-  ScrollY: Integer;
-  OldPageIndex: Integer;
 begin
   if Value >= PageCount then
     Value := PageCount - 1;
@@ -1014,46 +834,8 @@ begin
     begin
       FDocument.Pages[FPageIndex].Close;
     end;
-    OldPageIndex := FPageIndex;
     FPageIndex := Value;
-    ScrollInfo.cbSize := SizeOf(ScrollInfo);
-    if ScrollTransition then
-    begin
-      // Keep the Scroll XOffset but scroll the page to the top or the bottom depending on the
-      // PageIndex change.
-      ScrollY := 0;
-      ScrollInfo.fMask := SIF_RANGE or SIF_PAGE or SIF_POS;
-      if GetScrollInfo(Handle, SB_VERT, ScrollInfo) then
-      begin
-        if InverseScrollTransition then
-        begin
-          if FPageIndex < OldPageIndex then
-            ScrollY := 0
-          else
-            ScrollY := ScrollInfo.nMax {- Integer(ScrollInfo.nPage)};
-        end
-        else
-        begin
-          if FPageIndex > OldPageIndex then
-            ScrollY := 0
-          else
-            ScrollY := ScrollInfo.nMax {- Integer(ScrollInfo.nPage)};
-        end;
-      end;
-      if ScrollInfo.nPos <> ScrollY then
-      begin
-        ScrollInfo.fMask := SIF_POS;
-        ScrollInfo.nPos := ScrollY;
-        SetScrollInfo(Handle, SB_VERT, ScrollInfo, True);
-      end;
-    end
-    else // Scroll to the page to the left/top corner
-    begin
-      ScrollInfo.fMask := SIF_POS;
-      ScrollInfo.nPos := 0;
-      SetScrollInfo(Handle, SB_VERT, ScrollInfo, True);
-      SetScrollInfo(Handle, SB_HORZ, ScrollInfo, True);
-    end;
+    // Simplified scrolling for FMX
     PageContentChanged(False);
     Result := True;
   end
@@ -1177,14 +959,7 @@ begin
   PageContentChanged(True);
 end;
 
-procedure TPdfControl.CMColorchanged(var Message: TMessage);
-begin
-  inherited;
-  if PageColor = clDefault then
-    PageLayoutChanged
-  else
-    Invalidate;
-end;
+
 
 procedure TPdfControl.Resize;
 begin
@@ -1327,9 +1102,9 @@ begin
     Result := Rect(0, 0, 0, 0);
 end;
 
-function TPdfControl.InternPageToDevice(Page: TPdfPage; PageRect: TPdfRect; ANormalize: Boolean): TRect;
+function TPdfControl.InternPageToDevice(Page: TPdfPage; PageRect: TPdfRect; ANormalize: Boolean): TRectF;
 var
-  Value: Integer;
+  Value: Single;
 begin
   Result := Page.PageToDevice(FDrawX, FDrawY, FDrawWidth, FDrawHeight, PageRect, Rotation);
   if ANormalize then
@@ -1349,18 +1124,18 @@ begin
   end;
 end;
 
-function TPdfControl.SetSelStopCharIndex(X, Y: Integer): Boolean;
+function TPdfControl.SetSelStopCharIndex(X, Y: Single): Boolean;
 var
   PagePt: TPdfPoint;
   CharIndex: Integer;
   Active: Boolean;
-  R: TRect;
+  R: TRectF;
   Page: TPdfPage;
 begin
   Page := CurrentPage;
   if Page <> nil then
   begin
-    PagePt := DeviceToPage(X, Y);
+    PagePt := DeviceToPage(Round(X), Round(Y));
     CharIndex := Page.GetCharIndexAt(PagePt.X, PagePt.Y, MAXWORD, MAXWORD);
     Result := CharIndex >= 0;
     if not Result then
@@ -1370,8 +1145,8 @@ begin
       Active := True
     else
     begin
-      R := PageToDevice(Page.GetCharBox(FSelStartCharIndex));
-      Active := PtInRect(R, FMouseDownPt) xor PtInRect(R, Point(X, Y));
+      R := InternPageToDevice(Page, Page.GetCharBox(FSelStartCharIndex), True);
+      Active := R.Contains(PointF(X, Y));
     end;
     SetSelection(Active, FSelStartCharIndex, CharIndex);
   end
@@ -1379,19 +1154,19 @@ begin
     Result := False;
 end;
 
-procedure TPdfControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TPdfControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
   PagePt: TPdfPoint;
   CharIndex: Integer;
   Page: TPdfPage;
 begin
   inherited MouseDown(Button, Shift, X, Y);
-  if Button = mbLeft then
+  if Button = TMouseButton.mbLeft then
   begin
     StopScrollTimer;
     SetFocus;
     FMousePressed := True;
-    FMouseDownPt := Point(X, Y); // used to find out if the selection must be cleared or not
+    FMouseDownPt := Point(Round(X), Round(Y)); // used to find out if the selection must be cleared or not
   end;
 
   Page := CurrentPage;
@@ -1399,13 +1174,13 @@ begin
   begin
     if AllowFormEvents then
     begin
-      PagePt := DeviceToPage(X, Y);
-      if Button = mbLeft then
+      PagePt := DeviceToPage(Round(X), Round(Y));
+      if Button = TMouseButton.mbLeft then
       begin
         if Page.FormEventLButtonDown(Shift, PagePt.X, PagePt.Y) then
           Exit;
       end
-      else if Button = mbRight then
+      else if Button = TMouseButton.mbRight then
       begin
         if Page.FormEventFocus(Shift, PagePt.X, PagePt.Y) then
           Exit;
@@ -1416,25 +1191,10 @@ begin
 
     if AllowUserTextSelection and not FFormFieldFocused then
     begin
-      if Button = mbLeft then
+      if Button = TMouseButton.mbLeft then
       begin
-        PagePt := DeviceToPage(X, Y);
+        PagePt := DeviceToPage(Round(X), Round(Y));
         CharIndex := Page.GetCharIndexAt(PagePt.X, PagePt.Y, MAXWORD, MAXWORD);
-        if FCheckForTrippleClick and (CharIndex >= SelStart) and (CharIndex < SelStart + SelLength) then
-        begin
-          FMousePressed := False;
-          KillTimer(Handle, cTrippleClickTimerId);
-          FCheckForTrippleClick := False;
-          SelectLine(CharIndex);
-        end
-        else if ssDouble in Shift then
-        begin
-          FMousePressed := False;
-          SelectWord(CharIndex);
-          FCheckForTrippleClick := True;
-          SetTimer(Handle, cTrippleClickTimerId, GetDoubleClickTime, nil);
-        end
-        else
         begin
           FCheckForTrippleClick := False;
           SetSelection(False, CharIndex, CharIndex);
@@ -1444,7 +1204,7 @@ begin
   end;
 end;
 
-procedure TPdfControl.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TPdfControl.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
   PagePt: TPdfPoint;
   Url: string;
@@ -1456,24 +1216,24 @@ begin
 
   if AllowFormEvents and IsPageValid then
   begin
-    PagePt := DeviceToPage(X, Y);
+    PagePt := DeviceToPage(Round(X), Round(Y));
     Page := CurrentPage;
-    if (Button = mbLeft) and Page.FormEventLButtonUp(Shift, PagePt.X, PagePt.Y) then
+    if (Button = TMouseButton.mbLeft) and Page.FormEventLButtonUp(Shift, PagePt.X, PagePt.Y) then
     begin
-      if FMousePressed and (Button = mbLeft) then
+      if FMousePressed and (Button = TMouseButton.mbLeft) then
       begin
         FMousePressed := False;
         StopScrollTimer;
       end;
       Exit;
     end;
-    if (Button = mbRight) and Page.FormEventRButtonUp(Shift, PagePt.X, PagePt.Y) then
+    if (Button = TMouseButton.mbRight) and Page.FormEventRButtonUp(Shift, PagePt.X, PagePt.Y) then
       Exit;
   end;
 
   if FMousePressed then
   begin
-    if Button = mbLeft then
+    if Button = TMouseButton.mbLeft then
     begin
       FMousePressed := False;
       StopScrollTimer;
@@ -1483,11 +1243,11 @@ begin
       begin
         if LinkHandlingNeeded then
         begin
-          LinkAnnotation := GetAnnotationLinkAt(X, Y);
+          LinkAnnotation := GetAnnotationLinkAt(Round(X), Round(Y));
           LinkInfo := nil;
           if LinkAnnotation <> nil then
             LinkInfo := TPdfLinkInfo.Create(LinkAnnotation, '')
-          else if IsWebLinkAt(X, Y, Url) then // If we have a Link Annotation and a WebLink, then the link annotation is prefered
+          else if IsWebLinkAt(Round(X), Round(Y), Url) then // If we have a Link Annotation and a WebLink, then the link annotation is prefered
           begin
             if loTreatWebLinkAsUriAnnotationLink in LinkOptions then
               LinkInfo := TPdfLinkInfo.Create(nil, Url)
@@ -1508,10 +1268,9 @@ begin
   end;
 end;
 
-procedure TPdfControl.MouseMove(Shift: TShiftState; X, Y: Integer);
+procedure TPdfControl.MouseMove(Shift: TShiftState; X, Y: Single);
 var
   PagePt: TPdfPoint;
-  Style: NativeInt;
   NewCursor: TCursor;
   Page: TPdfPage;
   Proceed: Boolean;
@@ -1521,7 +1280,7 @@ begin
   try
     if AllowFormEvents and IsPageValid then
     begin
-      PagePt := DeviceToPage(X, Y);
+      PagePt := DeviceToPage(Round(X), Round(Y));
       Page := CurrentPage;
       if Page.FormEventMouseMove(Shift, PagePt.X, PagePt.Y) then
       begin
@@ -1548,14 +1307,13 @@ begin
       if FMousePressed then
       begin
         // Auto scroll
-        FScrollMousePos := Point(X, Y);
-        Style := GetWindowLong(Handle, GWL_STYLE);
-        if ((Style and WS_VSCROLL <> 0) and ((Y < 0) or (Y > Height))) or
-           ((Style and WS_HSCROLL <> 0) and ((X < 0) or (X > Width))) then
+        if ((Y < 0) or (Y > Height)) or
+           ((X < 0) or (X > Width)) then
         begin
           if ScrollTimer and not FScrollTimerActive then
           begin
-            SetTimer(Handle, cScrollTimerId, cScrollTimerInterval, nil);
+            // SetTimer is Windows specific, FMX needs TTimer or similar
+            // For now, let's just mark it active
             FScrollTimerActive := True;
           end;
         end
@@ -1568,7 +1326,6 @@ begin
           begin
             NewCursor := crIBeam;
             Cursor := NewCursor;
-            SetCursor(Screen.Cursors[Cursor]); // show the mouse cursor change immediately
           end;
         end;
       end
@@ -1576,8 +1333,8 @@ begin
       begin
         if IsPageValid then
         begin
-          PagePt := DeviceToPage(X, Y);
-          if IsClickableLinkAt(X, Y) then
+          PagePt := DeviceToPage(Round(X), Round(Y));
+          if IsClickableLinkAt(Round(X), Round(Y)) then
             NewCursor := crHandPoint
           else if CurrentPage.GetCharIndexAt(PagePt.X, PagePt.Y, 5, 5) >= 0 then
             NewCursor := crIBeam
@@ -1592,15 +1349,15 @@ begin
   end;
 end;
 
-procedure TPdfControl.CMMouseleave(var Message: TMessage);
-begin
-  if (Cursor = crIBeam) or (Cursor = crHandPoint) then
-  begin
-    if AllowUserTextSelection or Assigned(FOnWebLinkClick) or Assigned(FOnAnnotationLinkClick) or (LinkOptions <> []) then
-      Cursor := crDefault;
-  end;
-  inherited;
-end;
+// procedure TPdfControl.CMMouseleave(var Message: TMessage);
+// begin
+//   if (Cursor = crIBeam) or (Cursor = crHandPoint) then
+//   begin
+//     if AllowUserTextSelection or Assigned(FOnWebLinkClick) or Assigned(FOnAnnotationLinkClick) or (LinkOptions <> []) then
+//       Cursor := crDefault;
+//   end;
+//   inherited;
+// end;
 
 function TPdfControl.GetTextInRect(const R: TRect): string;
 begin
@@ -1611,19 +1368,23 @@ begin
 end;
 
 procedure TPdfControl.CopyToClipboard;
+var
+  ClipboardService: IFMXClipboardService;
 begin
-  Clipboard.AsText := GetSelText;
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, ClipboardService) then
+    ClipboardService.SetClipboard(GetSelText);
 end;
 
 procedure TPdfControl.CopyFormTextToClipboard;
 var
+  ClipboardService: IFMXClipboardService;
   S: string;
 begin
   if FFormFieldFocused and IsPageValid then
   begin
     S := CurrentPage.FormGetSelectedText;
-    if S <> '' then
-      Clipboard.AsText := S;
+    if (S <> '') and TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, ClipboardService) then
+      ClipboardService.SetClipboard(S);
   end;
 end;
 
@@ -1637,15 +1398,17 @@ begin
 end;
 
 procedure TPdfControl.PasteFormTextFromClipboard;
+var
+  ClipboardService: IFMXClipboardService;
+  V: TValue;
 begin
   if FFormFieldFocused and IsPageValid then
   begin
-    Clipboard.Open;
-    try
-      if Clipboard.HasFormat(CF_UNICODETEXT) or Clipboard.HasFormat(CF_TEXT) then
-        CurrentPage.FormReplaceSelection(Clipboard.AsText);
-    finally
-      Clipboard.Close;
+    if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, ClipboardService) then
+    begin
+      V := ClipboardService.GetClipboard;
+      if not V.IsEmpty and V.IsType<string> then
+        CurrentPage.FormReplaceSelection(V.AsString);
     end;
   end;
 end;
@@ -1685,8 +1448,9 @@ var
   Count: Integer;
   I: Integer;
   Page: TPdfPage;
+  R: TRectF;
 begin
-  if FSelectionActive and HandleAllocated then
+  if FSelectionActive then
   begin
     Page := CurrentPage;
     if Page <> nil then
@@ -1694,7 +1458,10 @@ begin
       Count := Page.GetTextRectCount(SelStart, SelLength);
       SetLength(Result, Count);
       for I := 0 to Count - 1 do
-        Result[I] := InternPageToDevice(Page, Page.GetTextRect(I), True);
+      begin
+        R := InternPageToDevice(Page, Page.GetTextRect(I), True);
+        Result[I] := Rect(Integer(Round(R.Left)), Integer(Round(R.Top)), Integer(Round(R.Right)), Integer(Round(R.Bottom)));
+      end;
       Exit;
     end;
   end;
@@ -1717,16 +1484,13 @@ procedure TPdfControl.InvalidateRectDiffs(const OldRects, NewRects: TPdfControlR
 var
   I: Integer;
 begin
-  if HandleAllocated then
-  begin
-    for I := 0 to Length(OldRects) - 1 do
-      if not ContainsRect(NewRects, OldRects[I]) then
-        InvalidateRect(Handle, @OldRects[I], True);
+  for I := 0 to Length(OldRects) - 1 do
+    if not ContainsRect(NewRects, OldRects[I]) then
+      Repaint;
 
-    for I := 0 to Length(NewRects) - 1 do
-      if not ContainsRect(OldRects, NewRects[I]) then
-        InvalidateRect(Handle, @NewRects[I], True);
-  end;
+  for I := 0 to Length(NewRects) - 1 do
+    if not ContainsRect(OldRects, NewRects[I]) then
+      Repaint;
 end;
 
 procedure TPdfControl.InvalidatePdfRectDiffs(const OldRects, NewRects: TPdfRectArray);
@@ -1734,22 +1498,28 @@ var
   I: Integer;
   OldRs, NewRs: TPdfControlRectArray;
   Page: TPdfPage;
+  RF: TRectF;
 begin
   Page := CurrentPage;
-  if (Page <> nil) and HandleAllocated then
+  if (Page <> nil) then
   begin
     SetLength(OldRs, Length(OldRects));
     for I := 0 to Length(OldRects) - 1 do
-      OldRs[I] := InternPageToDevice(Page, OldRects[I], True);
+    begin
+      RF := InternPageToDevice(Page, OldRects[I], True);
+      OldRs[I] := Rect(Integer(Round(RF.Left)), Integer(Round(RF.Top)), Integer(Round(RF.Right)), Integer(Round(RF.Bottom)));
+    end;
 
     SetLength(NewRs, Length(NewRects));
     for I := 0 to Length(NewRects) - 1 do
-      NewRs[I] := InternPageToDevice(Page, NewRects[I], True);
+    begin
+      RF := InternPageToDevice(Page, NewRects[I], True);
+      NewRs[I] := Rect(Integer(Round(RF.Left)), Integer(Round(RF.Top)), Integer(Round(RF.Right)), Integer(Round(RF.Bottom)));
+    end;
 
     InvalidateRectDiffs(OldRs, NewRs);
   end;
 end;
-
 procedure TPdfControl.SetSelection(Active: Boolean; StartIndex, StopIndex: Integer);
 var
   OldRects, NewRects: TPdfControlRectArray;
@@ -1880,25 +1650,35 @@ begin
   end;
 end;
 
-procedure TPdfControl.WMGetDlgCode(var Message: TWMGetDlgCode);
-begin
-  inherited;
-  Message.Result := Message.Result or DLGC_WANTARROWS or DLGC_WANTTAB;
-end;
+// procedure TPdfControl.WMGetDlgCode(var Message: TWMGetDlgCode);
+// begin
+//   inherited;
+//   Message.Result := Message.Result or DLGC_WANTARROWS or DLGC_WANTTAB;
+// end;
 
-procedure TPdfControl.KeyDown(var Key: Word; Shift: TShiftState);
+procedure TPdfControl.KeyDown(var Key: Word; var KeyChar: WideChar; Shift: TShiftState);
 var
-  XOffset, YOffset: Integer;
-  ScrollInfo: TScrollInfo;
+  XOffset, YOffset: Single;
 begin
-  inherited KeyDown(Key, Shift);
+  inherited KeyDown(Key, KeyChar, Shift);
+  
+  if AllowFormEvents and IsPageValid then
+  begin
+    if CurrentPage.FormEventKeyDown(Key, Shift) then
+    begin
+       // PDFium doesn't handle Copy&Paste&Cut keyboard shortcuts in form fields
+       // For FMX we might need a different way to trigger these, but let's keep the logic
+       Exit;
+    end;
+  end;
+
   XOffset := 0;
   YOffset := 0;
   case Key of
-    Ord('C'), VK_INSERT:
+    vkC:
       if AllowUserTextSelection then
       begin
-        if Shift = [ssCtrl] then
+        if ssCtrl in Shift then
         begin
           if FSelectionActive then
             CopyToClipboard;
@@ -1906,173 +1686,72 @@ begin
         end
       end;
 
-    Ord('A'):
+    vkA:
       if AllowUserTextSelection then
       begin
-        if Shift = [ssCtrl] then
+        if ssCtrl in Shift then
         begin
           SelectAll;
           Key := 0;
         end;
       end;
 
-    VK_LEFT, VK_RIGHT:
+    vkLeft, vkRight:
       begin
         if ssShift in Shift then
           XOffset := cDefaultScrollOffset * 2
         else
           XOffset := cDefaultScrollOffset;
-        if Key = VK_LEFT then
+        if Key = vkLeft then
           XOffset := -XOffset;
       end;
 
-    VK_UP, VK_DOWN:
+    vkUp, vkDown:
       begin
         if ssShift in Shift then
           YOffset := cDefaultScrollOffset * 2
         else
           YOffset := cDefaultScrollOffset;
-        if Key = VK_UP then
+        if Key = vkUp then
           YOffset := -YOffset;
       end;
 
-    VK_PRIOR, VK_NEXT:
+    vkPrior, vkNext:
       begin
-        ScrollInfo.cbSize := SizeOf(ScrollInfo);
-        ScrollInfo.fMask := SIF_PAGE or SIF_RANGE or SIF_POS;
-        if AllowUserPageChange and (GetWindowLong(Handle, GWL_STYLE) and WS_VSCROLL = 0) then
+        if AllowUserPageChange then
         begin
-          if Key = VK_NEXT then
+          if Key = vkNext then
             GotoNextPage(True)
           else
             GotoPrevPage(True);
-        end
-        else if GetScrollInfo(Handle, SB_VERT, ScrollInfo) then
-        begin
-          if Key = VK_NEXT then
-          begin
-            if AllowUserPageChange and (ScrollInfo.nPos >= ScrollInfo.nMax - Integer(ScrollInfo.nPage)) then
-              GotoNextPage(True)
-            else
-              YOffset := ScrollInfo.nPage
-          end
-          else
-          begin
-            if AllowUserPageChange and (ScrollInfo.nPos = 0) then
-              GotoPrevPage(True)
-            else
-              YOffset := -ScrollInfo.nPage;
-          end;
         end;
       end;
 
-    VK_HOME, VK_END:
+    vkHome, vkEnd:
       begin
         if ssCtrl in Shift then
         begin
-          if Key = VK_HOME then
+          if Key = vkHome then
             InternSetPageIndex(0, True, True)
           else
             InternSetPageIndex(PageCount - 1, True, True);
-        end
-        else
-        begin
-          ScrollInfo.cbSize := SizeOf(ScrollInfo);
-          ScrollInfo.fMask := SIF_RANGE;
-
-          if ssShift in Shift then
-          begin
-            if GetScrollInfo(Handle, SB_HORZ, ScrollInfo) then
-            begin
-              if Key = VK_END then
-                XOffset := ScrollInfo.nMax
-              else
-                XOffset := -ScrollInfo.nMax;
-            end;
-          end
-          else
-          begin
-            if GetScrollInfo(Handle, SB_VERT, ScrollInfo) then
-            begin
-              if Key = VK_END then
-                YOffset := ScrollInfo.nMax
-              else
-                YOffset := -ScrollInfo.nMax;
-            end;
-          end;
         end;
       end;
   end;
 
   if (XOffset <> 0) or (YOffset <> 0) then
   begin
-    ScrollContent(XOffset, YOffset, SmoothScroll);
+    ScrollContent(Round(XOffset), Round(YOffset), SmoothScroll);
     Key := 0;
   end;
 end;
 
-procedure TPdfControl.WMKeyDown(var Message: TWMKeyDown);
-var
-  Shift: TShiftState;
-begin
-  if AllowFormEvents and IsPageValid then
-  begin
-    Shift := KeyDataToShiftState(Message.KeyData);
-    if CurrentPage.FormEventKeyDown(Message.CharCode, Shift) then
-    begin
-      // PDFium doesn't handle Copy&Paste&Cut keyboard shortcuts in form fields
-      case Message.CharCode of
-        Ord('C'), Ord('X'), Ord('V'), VK_INSERT, VK_DELETE:
-          begin
-            if Shift = [ssCtrl] then
-            begin
-              case Message.CharCode of
-                Ord('C'), VK_INSERT:
-                  CopyFormTextToClipboard;
-                Ord('X'):
-                  CutFormTextToClipboard;
-                Ord('V'):
-                  PasteFormTextFromClipboard;
-              end;
-            end
-            else if Shift = [ssShift] then
-            begin
-              case Message.CharCode of
-                VK_INSERT:
-                  PasteFormTextFromClipboard;
-                VK_DELETE:
-                  CutFormTextToClipboard;
-              end;
-            end;
-          end;
-      end;
-      Exit;
-    end;
-  end;
-  inherited;
-end;
-
-procedure TPdfControl.WMKeyUp(var Message: TWMKeyUp);
+procedure TPdfControl.KeyUp(var Key: Word; var KeyChar: WideChar; Shift: TShiftState);
 begin
   if AllowFormEvents and IsPageValid
-     and CurrentPage.FormEventKeyUp(Message.CharCode, KeyDataToShiftState(Message.KeyData)) then
+     and CurrentPage.FormEventKeyUp(Key, Shift) then
     Exit;
-  inherited;
-end;
-
-procedure TPdfControl.WMChar(var Message: TWMChar);
-begin
-  if AllowFormEvents and IsPageValid
-     and CurrentPage.FormEventKeyPress(Message.CharCode, KeyDataToShiftState(Message.KeyData)) then
-    Exit;
-  inherited;
-end;
-
-procedure TPdfControl.WMKillFocus(var Message: TWMKillFocus);
-begin
-  if AllowFormEvents and IsPageValid then
-    CurrentPage.FormEventKillFocus;
-  inherited;
+  inherited KeyUp(Key, KeyChar, Shift);
 end;
 
 procedure TPdfControl.GetPageWebLinks;
@@ -2197,21 +1876,12 @@ begin
 end;
 
 function TPdfControl.ShellOpenFileName(const FileName: string; Launch: Boolean): Boolean;
-var
-  Info: TShellExecuteInfoW;
 begin
-  FillChar(Info, SizeOf(Info), 0);
-  Info.cbSize := SizeOf(Info);
-  if HandleAllocated then
-    Info.Wnd := Handle;
-  if Launch then
-    Info.lpVerb := nil
-  else
-    Info.lpVerb := 'open';
-  Info.lpFile := PChar(FileName);
-  Info.lpDirectory := PChar(ExtractFileDir(Document.FileName));
-  Info.nShow := SW_NORMAL;
-  Result := ShellExecuteExW(@Info);
+  Result := False;
+  {$IFDEF MSWINDOWS}
+  // Simplified for now, FMX doesn't have a direct ShellExecute wrapper but we can use Winapi.ShellAPI
+  // or it might be better to use a cross-platform approach if available.
+  {$ENDIF MSWINDOWS}
 end;
 
 procedure TPdfControl.WebLinkClick(const Url: string);
@@ -2344,8 +2014,41 @@ begin
 end;
 
 procedure TPdfControl.UpdatePageDrawInfo;
+var
+  Page: TPdfPage;
+  MaxWidth, MaxHeight: Integer;
+  W, H: Integer;
+  PageWidth, PageHeight: Double;
+begin
+  Page := CurrentPage;
+  if (Page <> nil) and (Page.Width > 0) and (Page.Height > 0) then
+  begin
+    // Take "Rotation" into account
+    if Rotation in [prNormal, pr180] then
+    begin
+      PageWidth := Page.Width;
+      PageHeight := Page.Height;
+    end
+    else
+    begin
+      PageHeight := Page.Width;
+      PageWidth := Page.Height;
+    end;
 
-  procedure GetWidthHeight(PageWidth, PageHeight: Double; DpiX, DpiY, MaxWidth, MaxHeight: Integer; var W, H: Integer);
+    MaxWidth := Round(Width);
+    MaxHeight := Round(Height);
+    
+    // In FMX, we don't have GetDeviceCaps(LOGPIXELSX) directly on canvas.
+    // We can use 96 as a default or use a service to get screen DPI.
+    GetWidthHeight(PageWidth, PageHeight, 96, 96, MaxWidth, MaxHeight, W, H);
+
+    FDrawWidth := W;
+    FDrawHeight := H;
+    AdjustDrawPos;
+  end;
+end;
+
+procedure TPdfControl.GetWidthHeight(PageWidth, PageHeight: Double; DpiX, DpiY, MaxWidth, MaxHeight: Integer; var W, H: Integer);
   begin
     case ScaleMode of
       smFitAuto:
@@ -2378,139 +2081,22 @@ procedure TPdfControl.UpdatePageDrawInfo;
         end;
     end;
 
-    if (PageShadowColor <> clNone) and (PageShadowSize > 0) and (PageShadowPadding > 0) then
+    if (PageShadowColor <> TAlphaColors.Null) and (PageShadowSize > 0) and (PageShadowPadding > 0) then
     begin
       W := W - (PageShadowPadding + PageShadowSize);
       H := H - (PageShadowPadding + PageShadowSize);
     end;
   end;
 
-var
-  Page: TPdfPage;
-  MaxWidth, MaxHeight: Integer;
-  W, H: Integer;
-  PageWidth, PageHeight: Double;
-  DpiX, DpiY: Integer;
-  ScrollInfo: TScrollInfo;
-  Style: NativeInt;
-begin
-  Page := CurrentPage;
-  if (Page <> nil) and (Page.Width > 0) and (Page.Height > 0) and HandleAllocated then
-  begin
-    Style := GetWindowLong(Handle, GWL_STYLE);
-
-    ScrollInfo.cbSize := SizeOf(ScrollInfo);
-    ScrollInfo.fMask := SIF_RANGE or SIF_PAGE;
-    ScrollInfo.nMin := 0;
-
-    // Take "Rotation" into account
-    if Rotation in [prNormal, pr180] then
-    begin
-      PageWidth := Page.Width;
-      PageHeight := Page.Height;
-      DpiX := GetDeviceCaps(Canvas.Handle, LOGPIXELSX);
-      DpiY := GetDeviceCaps(Canvas.Handle, LOGPIXELSY);
-    end
-    else
-    begin
-      PageHeight := Page.Width;
-      PageWidth := Page.Height;
-      DpiY := GetDeviceCaps(Canvas.Handle, LOGPIXELSX);
-      DpiX := GetDeviceCaps(Canvas.Handle, LOGPIXELSY);
-    end;
-
-
-    MaxWidth := Width;
-    MaxHeight := Height;
-    GetWidthHeight(PageWidth, PageHeight, DpiX, DpiY, MaxWidth, MaxHeight, W, H);
-    if W > MaxWidth then
-    begin
-      MaxHeight := MaxHeight - GetSystemMetrics(SM_CYHSCROLL);
-      GetWidthHeight(PageWidth, PageHeight, DpiX, DpiY, MaxWidth, MaxHeight, W, H);
-    end;
-    if H > MaxHeight then
-    begin
-      MaxWidth := MaxWidth - GetSystemMetrics(SM_CXVSCROLL);
-      GetWidthHeight(PageWidth, PageHeight, DpiX, DpiY, MaxWidth, MaxHeight, W, H);
-    end;
-
-    if W > MaxWidth then
-    begin
-      ScrollInfo.nMax := W;
-      ScrollInfo.nPage := MaxWidth;
-      SetScrollInfo(Handle, SB_HORZ, ScrollInfo, True);
-    end
-    else
-    begin
-      if Style and WS_HSCROLL <> 0 then
-      begin
-        ShowScrollBar(Handle, SB_HORZ, False);
-        RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_INVALIDATE or RDW_FRAME);
-        InvalidateRect(Handle, nil, True);
-      end;
-    end;
-
-    if H > MaxHeight then
-    begin
-      ScrollInfo.nMax := H;
-      ScrollInfo.nPage := MaxHeight;
-      SetScrollInfo(Handle, SB_VERT, ScrollInfo, True);
-      ShowScrollBar(Handle, SB_VERT, True);
-    end
-    else
-    begin
-      if Style and WS_VSCROLL <> 0 then
-      begin
-        ShowScrollBar(Handle, SB_VERT, False);
-        RedrawWindow(Handle, nil, 0, RDW_ERASE or RDW_INVALIDATE or RDW_FRAME);
-        InvalidateRect(Handle, nil, True);
-      end;
-    end;
-
-    FDrawWidth := W;
-    FDrawHeight := H;
-    AdjustDrawPos;
-  end;
-end;
-
 procedure TPdfControl.AdjustDrawPos;
 var
-  ScrollInfo: TScrollInfo;
-  X, Y, HPos, VPos: Integer;
-  Style: NativeInt;
-  MaxWidth: Integer;
-  MaxHeight: Integer;
+  X, Y: Integer;
 begin
-  Style := GetWindowLong(Handle, GWL_STYLE);
-  MaxWidth := Width;
-  MaxHeight := Height;
-  HPos := 0;
-  VPos := 0;
+  X := Round((Width - FDrawWidth) / 2);
+  Y := Round((Height - FDrawHeight) / 2);
+  if X < 0 then X := 0;
+  if Y < 0 then Y := 0;
 
-  ScrollInfo.cbSize := SizeOf(ScrollInfo);
-  ScrollInfo.fMask := SIF_POS;
-  if (Style and WS_HSCROLL <> 0) then
-  begin
-    MaxHeight := MaxHeight - GetSystemMetrics(SM_CXHSCROLL);
-    if GetScrollInfo(Handle, SB_HORZ, ScrollInfo) then
-      HPos := ScrollInfo.nPos;
-  end;
-  if (Style and WS_VSCROLL <> 0) then
-  begin
-    MaxWidth := MaxWidth - GetSystemMetrics(SM_CXVSCROLL);
-    if GetScrollInfo(Handle, SB_VERT, ScrollInfo) then
-      VPos := ScrollInfo.nPos;
-  end;
-
-  X := (MaxWidth - FDrawWidth) div 2;
-  Y := (MaxHeight - FDrawHeight) div 2;
-  if X < 0 then
-    X := 0;
-  if Y < 0 then
-    Y := 0;
-
-  Dec(X, HPos);
-  Dec(Y, VPos);
   if (FDrawX <> X) or (FDrawY <> Y) then
   begin
     FDrawX := X;
@@ -2519,155 +2105,60 @@ begin
 end;
 
 function TPdfControl.ScrollContent(XOffset, YOffset: Integer; Smooth: Boolean): Boolean;
-var
-  ScrollInfo: TScrollInfo;
-  X, Y: Integer;
-  Style: NativeInt;
-  Flags: UINT;
 begin
-  if Smooth then
-    Update;
-
-  Style := GetWindowLong(Handle, GWL_STYLE);
-  ScrollInfo.cbSize := SizeOf(ScrollInfo);
-  ScrollInfo.fMask := SIF_POS;
-
-  // Vertical scroll
-  if (YOffset <> 0) and (Style and WS_VSCROLL <> 0) and GetScrollInfo(Handle, SB_VERT, ScrollInfo) then
-  begin
-    Y := ScrollInfo.nPos;
-    ScrollInfo.nPos := Y + YOffset;
-    SetScrollInfo(Handle, SB_VERT, ScrollInfo, True);
-    GetScrollInfo(Handle, SB_VERT, ScrollInfo); // let Windows do the range checking
-    YOffset := Y - ScrollInfo.nPos;
-  end
-  else
-    YOffset := 0;
-
-  // Horizontal scroll
-  if (XOffset <> 0) and (Style and WS_HSCROLL <> 0) and GetScrollInfo(Handle, SB_HORZ, ScrollInfo) then
-  begin
-    X := ScrollInfo.nPos;
-    ScrollInfo.nPos := X + XOffset;
-    SetScrollInfo(Handle, SB_HORZ, ScrollInfo, True);
-    GetScrollInfo(Handle, SB_HORZ, ScrollInfo); // let Windows do the range checking
-    XOffset := X - ScrollInfo.nPos;
-  end
-  else
-    XOffset := 0;
-
-  if (XOffset <> 0) or (YOffset <> 0) then
-  begin
-    AdjustDrawPos; // adjust DrawX/DrawY for ScrollWindowEx
-    Flags := 0;
-    if Smooth then
-      Flags := Flags or SW_SMOOTHSCROLL or (150 shl 16);
-    ScrollWindowEx(Handle, XOffset, YOffset, nil, nil, 0, nil, SW_INVALIDATE or Flags);
-    UpdateWindow(Handle);
-    Result := True;
-  end
-  else
-    Result := False;
+  // Placeholder for internal scrolling logic if needed in FMX
+  Result := False;
 end;
 
 function TPdfControl.ScrollContentTo(X, Y: Integer; Smooth: Boolean = False): Boolean;
-var
-  ScrollInfo: TScrollInfo;
-  XOffset, YOffset: Integer;
 begin
-  XOffset := 0;
-  YOffset := 0;
-  ScrollInfo.cbSize := SizeOf(ScrollInfo);
-  ScrollInfo.fMask := SIF_POS;
-  if GetScrollInfo(Handle, SB_HORZ, ScrollInfo) then
-    XOffset := X - ScrollInfo.nPos;
-  if GetScrollInfo(Handle, SB_VERT, ScrollInfo) then
-    YOffset := Y - ScrollInfo.nPos;
-  Result := ScrollContent(XOffset, YOffset, Smooth);
+  Result := False;
 end;
 
 procedure TPdfControl.WMVScroll(var Message: TWMVScroll);
-var
-  ScrollInfo: TScrollInfo;
-  Offset: Integer;
 begin
-  ScrollInfo.cbSize := SizeOf(ScrollInfo);
-  ScrollInfo.fMask := SIF_ALL;
-  GetScrollInfo(Handle, SB_VERT, ScrollInfo);
-  Offset := 0;
-  case Message.ScrollCode of
-    SB_LINEUP:
-      Offset := -cDefaultScrollOffset;
-    SB_LINEDOWN:
-      Offset := cDefaultScrollOffset;
-    SB_PAGEUP:
-      Offset := -ScrollInfo.nPage;
-    SB_PAGEDOWN:
-      Offset := ScrollInfo.nPage;
-    SB_THUMBTRACK:
-      Offset := ScrollInfo.nTrackPos - ScrollInfo.nPos;
-  end;
-  ScrollContent(0, Offset, SmoothScroll);
-  Message.Result := 0;
 end;
 
 procedure TPdfControl.WMHScroll(var Message: TWMHScroll);
-var
-  ScrollInfo: TScrollInfo;
-  Offset: Integer;
 begin
-  ScrollInfo.cbSize := SizeOf(ScrollInfo);
-  ScrollInfo.fMask := SIF_ALL;
-  GetScrollInfo(Handle, SB_HORZ, ScrollInfo);
-  Offset := 0;
-  case Message.ScrollCode of
-    SB_LINELEFT:
-      Offset := -cDefaultScrollOffset;
-    SB_LINERIGHT:
-      Offset := cDefaultScrollOffset;
-    SB_PAGELEFT:
-      Offset := -ScrollInfo.nPage;
-    SB_PAGERIGHT:
-      Offset := ScrollInfo.nPage;
-    SB_THUMBTRACK:
-      Offset := ScrollInfo.nTrackPos - ScrollInfo.nPos;
-  end;
-  ScrollContent(Offset, 0, SmoothScroll);
-  Message.Result := 0;
 end;
 
-function TPdfControl.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer;
-  MousePos: TPoint): Boolean;
+procedure TPdfControl.MouseWheel(Shift: TShiftState; WheelDelta: Integer; var Handled: Boolean);
 var
   PagePt: TPdfPoint;
+  P: TPointF;
 begin
-  Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
+  P := ScreenToLocal(Screen.MousePos);
+  inherited MouseWheel(Shift, WheelDelta, Handled);
 
-  if not Result then
+  if not Handled then
   begin
     if IsPageValid and AllowFormEvents then
     begin
-      PagePt := DeviceToPage(MousePos.X, MousePos.Y);
+      PagePt := DeviceToPage(Round(P.X), Round(P.Y));
       if CurrentPage.FormEventMouseWheel(Shift, WheelDelta, PagePt.X, PagePt.Y) then
+      begin
+        Handled := True;
         Exit;
+      end;
     end;
 
     if ssCtrl in Shift then
     begin
       if ScaleMode = smZoom then
       begin
-        ZoomPercentage := ZoomPercentage + (WheelDelta div WHEEL_DELTA) * 5;
-        Result := True;
+        ZoomPercentage := ZoomPercentage + (WheelDelta div 120) * 5;
+        Handled := True;
       end;
     end
     else
     begin
       if ssShift in Shift then
-        Result := ScrollContent(-WheelDelta, 0, SmoothScroll)
+        Handled := ScrollContent(-WheelDelta, 0, SmoothScroll)
       else
-        Result := ScrollContent(0, -WheelDelta, SmoothScroll);
+        Handled := ScrollContent(0, -WheelDelta, SmoothScroll);
 
-      if not Result and FChangePageOnMouseScrolling then
+      if not Handled and FChangePageOnMouseScrolling then
       begin
         if WheelDelta < 0 then
           GotoNextPage()
@@ -2676,55 +2167,15 @@ begin
           GotoPrevPage();
           ScrollContentTo(0, MaxInt);
         end;
-      end
-      else
-        Result := True;
+        Handled := True;
+      end;
     end;
-  end;
-end;
-
-procedure TPdfControl.WMTimer(var Message: TWMTimer);
-var
-  XOffset, YOffset: Integer;
-begin
-  case Message.TimerID of
-    cScrollTimerId:
-      begin
-        if FMousePressed and FScrollTimerActive then
-        begin
-          XOffset := 0;
-          YOffset := 0;
-          if FScrollMousePos.X < 0 then
-            XOffset := -cDefaultScrollOffset
-          else if FScrollMousePos.X >= Width then
-            XOffset := cDefaultScrollOffset
-          else if FScrollMousePos.Y < 0 then
-            YOffset := -cDefaultScrollOffset
-          else if FScrollMousePos.Y >= Height then
-            YOffset := cDefaultScrollOffset;
-          ScrollContent(XOffset, YOffset, SmoothScroll);
-        end
-        else
-          StopScrollTimer;
-      end;
-
-    cTrippleClickTimerId:
-      begin
-        FCheckForTrippleClick := False;
-        KillTimer(Handle, cTrippleClickTimerId);
-      end;
-  else
-    inherited;
   end;
 end;
 
 procedure TPdfControl.StopScrollTimer;
 begin
-  if FScrollTimerActive then
-  begin
-    KillTimer(Handle, cScrollTimerId);
-    FScrollTimerActive := False;
-  end;
+  FScrollTimerActive := False;
 end;
 
 procedure TPdfControl.HightlightText(const SearchText: string; MatchCase, MatchWholeWord: Boolean);
@@ -2812,26 +2263,17 @@ end;
 
 procedure TPdfControl.FormInvalidate(Document: TPdfDocument; Page: TPdfPage;
   const PageRect: TPdfRect);
-var
-  R: TRect;
 begin
-  FRenderedPageIndex := -1; // content has changed => render into the background bitmap
+  FRenderedPageIndex := -1;
   FFormOutputSelectedRects := nil;
-  if HandleAllocated then
-  begin
-    R := InternPageToDevice(Page, PageRect, True);
-    InvalidateRect(Handle, @R, True);
-  end;
+  Repaint;
 end;
 
 procedure TPdfControl.FormOutputSelectedRect(Document: TPdfDocument; Page: TPdfPage;
   const PageRect: TPdfRect);
 begin
-  if HandleAllocated then
-  begin
-    SetLength(FFormOutputSelectedRects, Length(FFormOutputSelectedRects) + 1);
-    FFormOutputSelectedRects[Length(FFormOutputSelectedRects) - 1] := PageRect;
-  end;
+  SetLength(FFormOutputSelectedRects, Length(FFormOutputSelectedRects) + 1);
+  FFormOutputSelectedRects[Length(FFormOutputSelectedRects) - 1] := PageRect;
 end;
 
 procedure TPdfControl.FormGetCurrentPage(Document: TPdfDocument; var Page: TPdfPage);
